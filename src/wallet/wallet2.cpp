@@ -11944,12 +11944,9 @@ std::string wallet2::get_reserve_proof(const boost::optional<std::pair<uint32_t,
   for (const cryptonote::subaddress_index &index : subaddr_indices)
   {
     crypto::secret_key subaddr_spend_skey = m_account.get_keys().m_spend_secret_key;
-    if (!index.is_zero())
-    {
-      crypto::secret_key m = m_account.get_device().get_subaddress_secret_key(m_account.get_keys().m_view_secret_key, index);
-      crypto::secret_key tmp = subaddr_spend_skey;
-      sc_add((unsigned char*)&subaddr_spend_skey, (unsigned char*)&m, (unsigned char*)&tmp);
-    }
+    crypto::secret_key m = m_account.get_device().get_subaddress_secret_key(m_account.get_keys().m_view_secret_key, index);
+    crypto::secret_key tmp = subaddr_spend_skey;
+    sc_add((unsigned char*)&subaddr_spend_skey, (unsigned char*)&m, (unsigned char*)&tmp);
     crypto::public_key subaddr_spend_pkey;
     secret_key_to_public_key(subaddr_spend_skey, subaddr_spend_pkey);
     crypto::generate_signature(prefix_hash, subaddr_spend_pkey, subaddr_spend_skey, subaddr_spendkeys[subaddr_spend_pkey]);
@@ -12323,7 +12320,8 @@ std::string wallet2::sign(const std::string &data, message_signature_type_t sign
   uint8_t mode;
 
   // Use the base address
-  if (index.is_zero())
+  mode = 1;
+  if (mode >= 2)
   {
     switch (signature_type)
     {

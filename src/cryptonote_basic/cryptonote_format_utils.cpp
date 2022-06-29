@@ -358,15 +358,10 @@ namespace cryptonote
       // step 2: add Hs(a || index_major || index_minor)
       crypto::secret_key subaddr_sk;
       crypto::secret_key scalar_step2;
-      if (received_index.is_zero())
-      {
-        scalar_step2 = scalar_step1;    // treat index=(0,0) as a special case representing the main address
-      }
-      else
-      {
-        subaddr_sk = hwdev.get_subaddress_secret_key(ack.m_view_secret_key, received_index);
-        hwdev.sc_secret_add(scalar_step2, scalar_step1,subaddr_sk);
-      }
+
+      subaddr_sk = hwdev.get_subaddress_secret_key(ack.m_view_secret_key, received_index);
+      hwdev.sc_secret_add(scalar_step2, scalar_step1,subaddr_sk);
+
 
       in_ephemeral.sec = scalar_step2;
 
@@ -380,12 +375,9 @@ namespace cryptonote
         // when in multisig, we only know the partial spend secret key. but we do know the full spend public key, so the output pubkey can be obtained by using the standard CN key derivation
         CHECK_AND_ASSERT_MES(hwdev.derive_public_key(recv_derivation, real_output_index, ack.m_account_address.m_spend_public_key, in_ephemeral.pub), false, "Failed to derive public key");
         // and don't forget to add the contribution from the subaddress part
-        if (!received_index.is_zero())
-        {
-          crypto::public_key subaddr_pk;
-          CHECK_AND_ASSERT_MES(hwdev.secret_key_to_public_key(subaddr_sk, subaddr_pk), false, "Failed to derive public key");
-          add_public_key(in_ephemeral.pub, in_ephemeral.pub, subaddr_pk);
-        }
+        crypto::public_key subaddr_pk;
+        CHECK_AND_ASSERT_MES(hwdev.secret_key_to_public_key(subaddr_sk, subaddr_pk), false, "Failed to derive public key");
+        add_public_key(in_ephemeral.pub, in_ephemeral.pub, subaddr_pk);
       }
 
       CHECK_AND_ASSERT_MES(in_ephemeral.pub == out_key,
