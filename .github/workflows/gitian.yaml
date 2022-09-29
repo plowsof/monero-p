@@ -1,0 +1,36 @@
+name: testing
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build-gitian:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest ]
+        include:
+          - os: ubuntu-latest
+            option: l
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: recursive
+    - name: build
+      run: |
+        cd contrib/gitian
+        ./dockrun.sh v0.18.1.2
+      env:
+        OPT: -j 3 -o ${{ matrix.option }}
+    - name: post build
+      run: |
+        mkdir out
+        docker cp gitrun:/home/ubuntu/out/v0.18.1.2 out
+        shasum -a256 out/*
+    - uses: actions/upload-artifact@v3.1.0
+      with:
+        name: ${{ matrix.operating-system.name }}
+        path: |
+          /home/runner/work/monero/monero/out/*
