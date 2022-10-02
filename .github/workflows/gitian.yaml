@@ -27,12 +27,13 @@ jobs:
         sudo usermod -aG docker $USER
     - name: build
       run: |
-        curl -O https://raw.githubusercontent.com/monero-project/monero/${{ github.ref_name }}/contrib/gitian/gitian-build.py
+        branch="master"
+        curl -O https://raw.githubusercontent.com/monero-project/monero/${branch}/contrib/gitian/gitian-build.py
         sudo chmod +x gitian-build.py
         cat gitian-build.py
         ls -la
-        sudo ./gitian-build.py --setup --docker github-actions ${{ github.ref_name }}
-        sudo ./gitian-build.py --docker --detach-sign --no-commit --build -j 3 -o ${{ matrix.operating-system.option }} github-actions ${{ github.ref_name }}
+        sudo ./gitian-build.py --setup --docker github-actions ${branch}
+        sudo ./gitian-build.py --docker --detach-sign --no-commit --build -j 3 -o ${{ matrix.operating-system.option }} github-actions ${master}
     - name: post build
       run: |
         shasum -a256 out/${{ github.ref_name }}/*
