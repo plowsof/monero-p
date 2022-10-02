@@ -1,36 +1,41 @@
-name: testing
+name: ci/gh-actions/gitian
 
-on: 
+on:
   workflow_dispatch:
 
 jobs:
   build-gitian:
+    runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest ]
-        include:
-          - os: ubuntu-latest
-            option: l
-    runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os }}
+        operating-system:
+          - name: "Linux"
+            option: "l"
+          - name: "Windows"
+            option: "w"
+          - name: "Android"
+            option: "a"
+          - name: "FreeBSD"
+            option: "f"
+          - name: "macOS"
+            option: "m"
+    name: ${{ matrix.operating-system.name }}
     steps:
-    - uses: actions/checkout@v1
-      with:
-        submodules: recursive
     - name: build
       run: |
-        cd contrib/gitian
-        ./dockrun.sh v0.18.1.2
-      env:
-        OPT: -j 3 -o ${{ matrix.option }}
+        curl -O https://raw.githubusercontent.com/monero-project/monero/${{ github.ref_name }}/contrib/gitian/gitian-build.py
+        chmod +x gitian-build.py
+        ./gitian-build.py --setup --docker github-actions ${{ github.ref_name }}
+        ./gitian-build.py --docker --detach-sign --no-commit --build -j 3 -o ${{ matrix.operating-system.option }} github-actions ${{ github.ref_name }}
     - name: post build
       run: |
-        mkdir out
-        docker cp gitrun:/home/ubuntu/out/v0.18.1.2 out
-        shasum -a256 out/*
+        shasum -a256 out/${{ github.ref_name }}/*
+        echo \`\`\` >> $GITHUB_STEP_SUMMARY
+        shasum -a256 out/${{ github.ref_name }}/* >> $GITHUB_STEP_SUMMARY
+        echo \`\`\` >> $GITHUB_STEP_SUMMARY
     - uses: actions/upload-artifact@v3.1.0
       with:
         name: ${{ matrix.operating-system.name }}
         path: |
-          /home/runner/work/monero/monero/out/*
+          out/${{ github.ref_name }}/*
