@@ -33,7 +33,7 @@ jobs:
         cat gitian-build.py
         ls -la
         sudo ./gitian-build.py --setup --docker github-actions ${branch}
-        sudo ./gitian-build.py --docker --detach-sign --no-commit --build -j 3 -o ${{ matrix.operating-system.option }} github-actions ${master}
+        sudo ./gitian-build.py --docker --detach-sign --no-commit --build -j 3 -o ${{ matrix.operating-system.option }} github-actions ${branch}
     - name: post build
       run: |
         shasum -a256 out/${{ github.ref_name }}/*
