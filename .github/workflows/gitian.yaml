@@ -25,6 +25,7 @@ jobs:
     - name: build
       run: |
         branch="master"
+        mkdir -p sanity/lol/ok
         curl -O https://raw.githubusercontent.com/monero-project/monero/${branch}/contrib/gitian/gitian-build.py
         chmod +x gitian-build.py
         cat gitian-build.py
