@@ -44,8 +44,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "Copyright: Update to ${{ env.YEAR }}"
-          committer: GitHub <noreply@github.com>
-          author: helloworld <helloworld@github.com>
+          committer: monero-project <noreply@github.com>
+          author: monero-project <noreply@github.com>
           signoff: false
           branch: bump-copyright-year
           delete-branch: true
