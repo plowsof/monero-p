@@ -34,14 +34,14 @@ jobs:
                   # we need to replace FROM with current year
                   to=$(awk '{split($0, array, "-"); print array[2]}' <<< ${fromTo})
                   # replace $to with current year in the line
-                  repl=${line/"$to"/"$year"}
+                  #repl=${line/"$to"/"$year"}
               else
                   # we only have a FROM year.
                   # find occurance of 4 digits
                   from=$(grep -o "[0-9]\{4\}" <<< $line)
                   fromTo="${from}-${year}"
                   # replace FROM with FROM-TO
-                  repl=${line/"$from"/"$fromTo"}
+                  #repl=${line/"$from"/"$fromTo"}
               fi
               echo "attempt sed"
               #sed -i "s|${line}|${repl}|g" $file
