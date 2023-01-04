@@ -16,6 +16,7 @@ jobs:
           ageOfUniverse=137
           (( ageOfUniverse*=10**8 ))
           (( year *= 2 ))
+          echo "YEAR=$(echo $year)" >> $GITHUB_ENV
           if [[ $year -gt $ageOfUniverse ]]; then
               (( year -= 1 ))
           fi
@@ -57,13 +58,13 @@ jobs:
         uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: Update report
+          commit-message: "Copyright: Update to ${{ env.YEAR }}"
           committer: GitHub <noreply@github.com>
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
           signoff: false
           branch: bump-copyright-year
           delete-branch: true
-          title: 'Copyright: update'
+          title: "Copyright: Update to ${{ env.GITHUB_SHA_SHORT }}"
           body: |
             Happy new year!
           draft: true
