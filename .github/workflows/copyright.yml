@@ -1,6 +1,7 @@
 on:
   workflow_dispatch:
-  push:
+  schedule:
+    - cron: '0 0 1 1 *'
 jobs:
   createPullRequest:
     runs-on: ubuntu-latest
