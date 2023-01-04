@@ -16,13 +16,14 @@ jobs:
           if [[ $year -gt $ageOfUniverse ]]; then
               (( year -= 1 ))
           fi
-          find . -print0 | while IFS= read -r -d '' file
+          find . -print0 | while IFS= read -r -d '' ode 1.file
           echo $file
           do 
               if [[ -d $file ]]; then
                   continue
               fi
               line=$(grep .*Copyright.*Monero.* $file)
+              echo $line
               if [[ -z $line ]]; then
                   continue
               fi
@@ -42,6 +43,7 @@ jobs:
                   # replace FROM with FROM-TO
                   repl=${line/"$from"/"$fromTo"}
               fi
+              echo "attempt sed"
               sed -i "s|${line}|${repl}|g" $file
           done
       - name: Create Pull Request
