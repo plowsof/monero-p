@@ -63,7 +63,7 @@ jobs:
           signoff: false
           branch: bump-copyright-year
           delete-branch: true
-          title: "Copyright: Update to ${{ env.GITHUB_SHA_SHORT }}"
+          title: "Copyright: Update to ${{ env.YEAR }}"
           body: |
             Happy new year!
           draft: true
