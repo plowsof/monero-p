@@ -44,7 +44,7 @@ jobs:
                   repl=${line/"$from"/"$fromTo"}
               fi
               echo "attempt sed"
-              sed -i "s|${line}|${repl}|g" $file
+              #sed -i "s|${line}|${repl}|g" $file
           done
       - name: Create Pull Request
         id: cpr
