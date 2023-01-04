@@ -21,6 +21,7 @@ jobs:
           fi
           find . -print0 | while IFS= read -r -d '' file
           do 
+              echo $file
               if [[ -d $file ]]; then
                   continue
               fi
@@ -42,7 +43,7 @@ jobs:
               else
                   # we only have a FROM year.
                   # find occurance of 4 digits
-                  from=$(grep -o "[0-9]\{4\}" <<< $line)
+                  from=$(grep -o "[0-9]\{4\}" <<< $line || true)
                   fromTo="${from}-${year}"
                   # replace FROM with FROM-TO
                   repl=${line/"$from"/"$fromTo"}
