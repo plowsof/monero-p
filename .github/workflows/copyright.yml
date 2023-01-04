@@ -17,6 +17,7 @@ jobs:
               (( year -= 1 ))
           fi
           find . -print0 | while IFS= read -r -d '' file
+          echo $file
           do 
               if [[ -d $file ]]; then
                   continue
