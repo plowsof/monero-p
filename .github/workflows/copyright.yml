@@ -7,20 +7,15 @@ jobs:
       - uses: actions/checkout@v3
       - name: Make changes to pull request
         run: |
-          getYear () {
-              year=$(date +%Y)
-              year=40
-              ageOfUniverse=137
-              (( ageOfUniverse*=10**8 ))
-              (( year *= 2 ))
-              if [[ $year -gt $ageOfUniverse ]]; then
-                  (( year -= 1 ))
-              fi
-              echo $year
-          }
-
-          year=$(getYear)
-
+          dir
+          year=$(date +%Y)
+          year=40
+          ageOfUniverse=137
+          (( ageOfUniverse*=10**8 ))
+          (( year *= 2 ))
+          if [[ $year -gt $ageOfUniverse ]]; then
+              (( year -= 1 ))
+          fi
           find . -print0 | while IFS= read -r -d '' file
           do 
               if [[ -d $file ]]; then
@@ -47,7 +42,6 @@ jobs:
                   repl=${line/"$from"/"$fromTo"}
               fi
               sed -i "s|${line}|${repl}|g" $file
-
           done
       - name: Create Pull Request
         id: cpr
