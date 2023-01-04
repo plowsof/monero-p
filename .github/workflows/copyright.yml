@@ -26,6 +26,7 @@ jobs:
               if [[ $file == *".git"* ]]; then
                   continue
               fi
+              echo "here"
               line=$(grep .*Copyright.*Monero.* $file)
               echo $line
           done
