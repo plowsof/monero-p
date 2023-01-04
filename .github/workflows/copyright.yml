@@ -8,6 +8,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Make changes to pull request
         continue-on-error: true
+        shell: bash
         run: |
           dir
           year=$(date +%Y)
@@ -28,7 +29,7 @@ jobs:
                   continue
               fi
               echo "here"
-              line=$(grep .*Copyright.*Monero.* $file)
+              line=$(grep .*Copyright.*Monero.* $file || true)
               echo $line
           done
       - name: Create Pull Request
