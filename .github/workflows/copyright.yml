@@ -19,7 +19,8 @@ jobs:
           find . -print0 | while IFS= read -r -d '' file
           echo $file
           do 
-            echo $file
+            line=$(grep .*Copyright.*Monero.* $file)
+            echo $line
           done
       - name: Create Pull Request
         id: cpr
