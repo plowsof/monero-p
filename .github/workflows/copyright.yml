@@ -33,7 +33,7 @@ jobs:
                   continue
               fi
 
-              fromTo=$(grep -o "[0-9]\{4\}-[0-9]\{4\}" <<< $line)
+              fromTo=$(grep -o "[0-9]\{4\}-[0-9]\{4\}" <<< $line || true)
               if [[ ! -z $fromTo ]]; then
                   # string contains "FROM-TO"
                   # we need to replace FROM with current year
