@@ -10578,7 +10578,11 @@ bool wallet2::sanity_check(const std::vector<wallet2::pending_tx> &ptx_vector, s
   for (const auto &r: required)
   {
     const account_public_address &address = r.first;
-
+    if (address.m_spend_public_key == cryptonote::zero_public_key && address.m_view_public_key == cryptonote::zero_public_key)
+    {
+      //skip burn verification
+      continue;
+    }
     uint64_t total_received = 0;
     for (const auto &ptx: ptx_vector)
     {

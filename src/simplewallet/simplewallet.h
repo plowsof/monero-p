@@ -170,8 +170,10 @@ namespace cryptonote
     bool show_incoming_transfers(const std::vector<std::string> &args);
     bool show_payments(const std::vector<std::string> &args);
     bool show_blockchain_height(const std::vector<std::string> &args);
-    bool transfer_main(int transfer_type, const std::vector<std::string> &args, bool called_by_mms);
+    bool transfer_main(int transfer_type, const std::vector<std::string> &args, bool called_by_mms, bool do_burn = false, bool do_mint_ordinal = false, const tx_extra_ordinal_register& ordinal = tx_extra_ordinal_register());
     bool transfer(const std::vector<std::string> &args);
+    bool burn(const std::vector<std::string>& args_);
+    bool mint_ordinal(const std::vector<std::string>& args_);
     bool locked_transfer(const std::vector<std::string> &args);
     bool locked_sweep_all(const std::vector<std::string> &args);
     bool sweep_main(uint32_t account, uint64_t below, bool locked, const std::vector<std::string> &args);

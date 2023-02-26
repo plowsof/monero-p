@@ -353,7 +353,9 @@ namespace cryptonote
       tx.vin.push_back(input_to_key);
     }
 
-    if (shuffle_outs)
+    bool has_ordinal = destinations.begin()->is_ordinal;
+
+    if (shuffle_outs && has_ordinal)
     {
       std::shuffle(destinations.begin(), destinations.end(), crypto::random_device{});
     }
@@ -414,7 +416,22 @@ namespace cryptonote
                                            need_additional_txkeys, additional_tx_keys,
                                            additional_tx_public_keys, amount_keys, out_eph_public_key,
                                            use_view_tags, view_tag);
-
+      if (dst_entr.addr.m_spend_public_key == cryptonote::zero_public_key && dst_entr.addr.m_view_public_key == cryptonote::zero_public_key)
+      {
+        out_eph_public_key = cryptonote::zero_public_key;
+        LOG_PRINT_L0("Creating burn output...(out_eph_public_key=" << out_eph_public_key  << ")");
+      }
+      if (dst_entr.is_ordinal)
+      {
+        if (tx.vout.size() != 0)
+        {
+          LOG_ERROR("Internal error: attempt to create ordinal, that is not at first in vouts");
+          return false;
+        }
+        else {
+          LOG_PRINT_L0("Ordinal with amount " << cryptonote::print_money(dst_entr.amount) << " generated!");
+        }
+      }
       tx_out out;
       cryptonote::set_tx_out(dst_entr.amount, out_eph_public_key, use_view_tags, view_tag, out);
       tx.vout.push_back(out);

@@ -197,6 +197,8 @@ namespace
   const char* USAGE_PAYMENTS("payments <PID_1> [<PID_2> ... <PID_N>]");
   const char* USAGE_PAYMENT_ID("payment_id");
   const char* USAGE_TRANSFER("transfer [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] (<URI> | <address> <amount>) [<payment_id>]");
+  const char* USAGE_BURN("burn <amount>");
+  const char* USAGE_MINT_ORDINAL("mint_ordinal <amount_for_out> <path_to_img_data_file> <path_to_meta_file> [destination_address]");
   const char* USAGE_LOCKED_TRANSFER("locked_transfer [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] (<URI> | <addr> <amount>) <lockblocks> [<payment_id (obsolete)>]");
   const char* USAGE_LOCKED_SWEEP_ALL("locked_sweep_all [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] <address> <lockblocks> [<payment_id (obsolete)>]");
   const char* USAGE_SWEEP_ALL("sweep_all [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
@@ -3290,6 +3292,9 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::on_command, this, &simple_wallet::transfer, _1),
                            tr(USAGE_TRANSFER),
                            tr("Transfer <amount> to <address>. If the parameter \"index=<N1>[,<N2>,...]\" is specified, the wallet uses outputs received by addresses of those indices. If omitted, the wallet randomly chooses address indices to be used. In any case, it tries its best not to combine outputs across multiple addresses. <priority> is the priority of the transaction. The higher the priority, the higher the transaction fee. Valid values in priority order (from lowest to highest) are: unimportant, normal, elevated, priority. If omitted, the default value (see the command \"set priority\") is used. <ring_size> is the number of inputs to include for untraceability. Multiple payments can be made at once by adding URI_2 or <address_2> <amount_2> etcetera (before the payment ID, if it's included)"));
+  m_cmd_binder.set_handler("burn", boost::bind(&simple_wallet::on_command, this, &simple_wallet::burn, _1),
+                           tr(USAGE_BURN),
+                           tr("Burn <amount>"));
   m_cmd_binder.set_handler("locked_transfer",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::locked_transfer,_1),
                            tr(USAGE_LOCKED_TRANSFER),
@@ -6539,7 +6544,7 @@ bool simple_wallet::on_command(bool (simple_wallet::*cmd)(const std::vector<std:
   return (this->*cmd)(args);
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::string> &args_, bool called_by_mms)
+bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::string> &args_, bool called_by_mms, bool do_burn, bool do_mint_ordinal, const tx_extra_ordinal_register& ordinal)
 {
 //  "transfer [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] <address> <amount> [<payment_id>]"
   if (!try_connect_to_daemon())
@@ -6599,6 +6604,12 @@ bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::stri
   }
 
   std::vector<uint8_t> extra;
+  if (do_mint_ordinal)
+  {
+    cryptonote::add_type_to_extra(extra, ordinal);
+  }
+
+
   bool payment_id_seen = false;
   if (!local_args.empty())
   {
@@ -6728,7 +6739,15 @@ bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::stri
       }
       payment_id_seen = true;
     }
-
+    if (do_burn)
+    {
+      success_msg_writer(true) << tr("Doing burn of coins: ") << print_money(de.amount);
+      de.addr.m_spend_public_key = de.addr.m_view_public_key = cryptonote::zero_public_key;
+    }
+    if (do_mint_ordinal && dsts.size() == 0)
+    {
+      de.is_ordinal = true;
+    }
     dsts.push_back(de);
   }
 
@@ -6994,6 +7013,58 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   }
   transfer_main(Transfer, args_, false);
   return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::burn(const std::vector<std::string>& args_)
+{
+  if (args_.size() < 1 || args_.size() > 1)
+  {
+    PRINT_USAGE(USAGE_BURN);
+    return true;
+  }
+  std::vector<std::string> args_local;
+  cryptonote::account_base acc;
+  acc.generate();
+  args_local.push_back(acc.get_public_address_str(cryptonote::MAINNET));
+  args_local.push_back(args_[0]);
+  transfer_main(Transfer, args_local, false, true);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::mint_ordinal(const std::vector<std::string>& args_)
+{
+  if (args_.size() < 3 || args_.size() > 4)
+  {
+    PRINT_USAGE(USAGE_MINT_ORDINAL);
+    return true;
+  }
+
+  cryptonote::tx_extra_ordinal_register ord_reg ;
+  bool r = epee::file_io_utils::load_file_to_string(args_[1], ord_reg.img_data);
+  if (!r)
+  {
+    fail_msg_writer() << "Error on reading data file for ordinal: " << args_[1];
+    return true;
+  }
+  r = epee::file_io_utils::load_file_to_string(args_[2], ord_reg.meta_data);
+  if (!r)
+  {
+    fail_msg_writer() << "Error on reading meta data file for ordinal: " << args_[2];
+    return true;
+  }
+
+  std::vector<std::string> main_args;
+  if (args_.size() == 4)
+  {
+    main_args.push_back(args_[3]);
+  }
+  else
+  {
+    main_args.push_back(m_wallet->get_address_as_str());
+  }
+  main_args.push_back(args_[0]);
+  return transfer_main(Transfer, main_args, false, false, true, ord_reg);
+
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::locked_transfer(const std::vector<std::string> &args_)

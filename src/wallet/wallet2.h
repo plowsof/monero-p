@@ -789,6 +789,14 @@ private:
       END_SERIALIZE()
     };
 
+    struct wallet_ordinal
+    {
+        uint64_t transfer_index;
+        crypto::hash origin_id;
+    };
+
+
+
     typedef std::tuple<uint64_t, crypto::public_key, rct::key> get_outs_entry;
 
     struct parsed_block
@@ -1104,6 +1112,7 @@ private:
     void get_unconfirmed_payments_out(std::list<std::pair<crypto::hash,wallet2::unconfirmed_transfer_details>>& unconfirmed_payments, const boost::optional<uint32_t>& subaddr_account = boost::none, const std::set<uint32_t>& subaddr_indices = {}) const;
     void get_unconfirmed_payments(std::list<std::pair<crypto::hash,wallet2::pool_payment_details>>& unconfirmed_payments, const boost::optional<uint32_t>& subaddr_account = boost::none, const std::set<uint32_t>& subaddr_indices = {}) const;
 
+
     uint64_t get_blockchain_current_height() const { return m_light_wallet_blockchain_height ? m_light_wallet_blockchain_height : m_blockchain.size(); }
     void rescan_spent();
     void rescan_blockchain(bool hard, bool refresh = true, bool keep_key_images = false);
@@ -1239,6 +1248,11 @@ private:
         return;
       }
       a & m_has_ever_refreshed_from_node;
+      if (ver < 31)
+      {
+          return;
+      }
+      a & m_ordinals;
     }
 
     BEGIN_SERIALIZE_OBJECT()
@@ -1814,6 +1828,7 @@ private:
     const std::vector<std::vector<tools::wallet2::multisig_info>> *m_multisig_rescan_info;
     const std::vector<std::vector<rct::key>> *m_multisig_rescan_k;
     serializable_unordered_map<crypto::public_key, crypto::key_image> m_cold_key_images;
+    std::map<uint64_t, wallet_ordinal> m_ordinals; //mapping: ordinal_id -> ordinal details
 
     std::atomic<bool> m_run;
 
@@ -1931,7 +1946,7 @@ private:
     static std::string default_daemon_address;
   };
 }
-BOOST_CLASS_VERSION(tools::wallet2, 30)
+BOOST_CLASS_VERSION(tools::wallet2, 100)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 12)
 BOOST_CLASS_VERSION(tools::wallet2::multisig_info, 1)
 BOOST_CLASS_VERSION(tools::wallet2::multisig_info::LR, 0)
@@ -2444,6 +2459,13 @@ namespace boost
       if (ver < 3)
         return;
       a & x.multisig_sigs;
+    }
+
+    template <class Archive>
+    inline void serialize(Archive& a, tools::wallet2::wallet_ordinal& x, const boost::serialization::version_type ver)
+    {
+      a& x.transfer_index;
+      a& x.origin_id;
     }
   }
 }

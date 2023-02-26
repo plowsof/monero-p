@@ -36,6 +36,11 @@
 
 namespace cryptonote
 {
+
+  const static crypto::public_key zero_public_key = crypto::public_key();
+
+
+
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_weight, uint64_t already_generated_coins, size_t current_block_weight, uint64_t fee, const account_public_address &miner_address, transaction& tx, const blobdata& extra_nonce = blobdata(), size_t max_outs = 999, uint8_t hard_fork_version = 1);
 
@@ -78,6 +83,7 @@ namespace cryptonote
     account_public_address addr;        //destination address
     bool is_subaddress;
     bool is_integrated;
+    bool is_ordinal = false;
 
     tx_destination_entry() : amount(0), addr(AUTO_VAL_INIT(addr)), is_subaddress(false), is_integrated(false) { }
     tx_destination_entry(uint64_t a, const account_public_address &ad, bool is_subaddress) : amount(a), addr(ad), is_subaddress(is_subaddress), is_integrated(false) { }
