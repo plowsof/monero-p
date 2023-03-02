@@ -355,7 +355,7 @@ namespace cryptonote
 
     bool has_ordinal = destinations.begin()->is_ordinal;
 
-    if (shuffle_outs && has_ordinal)
+    if (shuffle_outs && !has_ordinal)
     {
       std::shuffle(destinations.begin(), destinations.end(), crypto::random_device{});
     }

@@ -78,6 +78,7 @@ cmake-build-debug/
 
 ### VSCode ###
 .vscode/
+.vs/
 
 ### Eclipse ###
 *.pydevproject

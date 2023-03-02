@@ -154,6 +154,7 @@ private:
     virtual boost::optional<epee::wipeable_string> on_device_pin_request() { return boost::none; }
     virtual boost::optional<epee::wipeable_string> on_device_passphrase_request(bool & on_device) { on_device = true; return boost::none; }
     virtual void on_device_progress(const hw::device_progress& event) {};
+    virtual void on_general_message(const std::string& message) {};
     // Common callbacks
     virtual void on_pool_tx_removed(const crypto::hash &txid) {}
     virtual ~i_wallet2_callback() {}
@@ -791,8 +792,7 @@ private:
 
     struct wallet_ordinal
     {
-        uint64_t transfer_index;
-        crypto::hash origin_id;
+        crypto::hash ordinal_hash; //hash of img data
     };
 
 
@@ -2464,8 +2464,7 @@ namespace boost
     template <class Archive>
     inline void serialize(Archive& a, tools::wallet2::wallet_ordinal& x, const boost::serialization::version_type ver)
     {
-      a& x.transfer_index;
-      a& x.origin_id;
+      a& x.ordinal_hash;
     }
   }
 }

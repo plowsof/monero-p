@@ -3295,6 +3295,9 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("burn", boost::bind(&simple_wallet::on_command, this, &simple_wallet::burn, _1),
                            tr(USAGE_BURN),
                            tr("Burn <amount>"));
+    m_cmd_binder.set_handler("mint_ordinal", boost::bind(&simple_wallet::on_command, this, &simple_wallet::mint_ordinal, _1),
+                           tr(USAGE_MINT_ORDINAL),
+                           tr("mint_ordinal <amount_for_out> <path_to_img_data_file> <path_to_meta_file> [destination_address]"));
   m_cmd_binder.set_handler("locked_transfer",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::locked_transfer,_1),
                            tr(USAGE_LOCKED_TRANSFER),
@@ -5778,6 +5781,10 @@ void simple_wallet::on_skip_transaction(uint64_t height, const crypto::hash &txi
 {
   if (m_locked)
     return;
+}
+void simple_wallet::on_general_message(const std::string& message)
+{
+  message_writer(console_color_magenta, true) << message;
 }
 //----------------------------------------------------------------------------------------------------
 boost::optional<epee::wipeable_string> simple_wallet::on_get_password(const char *reason)
