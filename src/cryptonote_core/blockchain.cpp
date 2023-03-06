@@ -463,6 +463,18 @@ bool Blockchain::init(BlockchainDB* db, const network_type nettype, bool offline
       rx_set_main_seedhash(seedhash.data, tools::get_max_concurrency());
   }
 
+  if (!m_ordinals.init())
+  {
+    LOG_ERROR("Ordinals initialization failed");
+    return false;
+  }
+  if (m_db->height() != m_ordinals.get_block_height() + 1)
+  {
+    LOG_ERROR("Ordinals initialization failed: height missmatch() " << m_db->height() << " & " << m_ordinals.get_block_height() + 1);
+    return false;
+  }
+  MWARNING("Ordinals initialized with " << m_ordinals.get_ordinals_count() << " items");
+
   return true;
 }
 //------------------------------------------------------------------
@@ -536,6 +548,7 @@ bool Blockchain::deinit()
   {
     LOG_ERROR("There was an issue closing/storing the blockchain, shutting down now to prevent issues!");
   }
+  m_ordinals.deinit();
 
   delete m_hardfork;
   m_hardfork = NULL;
@@ -651,7 +664,18 @@ block Blockchain::pop_block_from_blockchain()
         LOG_ERROR("Error returning transaction to tx_pool");
       }
     }
+    else
+    {
+      //updating ordinals
+      if (m_db->height() > 2833000)
+      {
+        m_ordinals.on_pop_transaction(tx);
+      }
+    }
   }
+
+  m_ordinals.set_block_height(m_db->height() - 1);
+
   if (pruned)
     MWARNING(pruned << " pruned txes could not be added back to the txpool");
 
@@ -4530,6 +4554,16 @@ leave:
   }
 
   TIME_MEASURE_FINISH(addblock);
+  //updating ordinals
+  if (m_db->height() > 2833000)
+  {
+    for (auto it_txs = txs.begin(); it_txs != txs.end(); it_txs++)
+    {
+      m_ordinals.on_push_transaction(it_txs->first, m_db->height() - 1);
+    }
+  }
+  m_ordinals.set_block_height(m_db->height() - 1);
+
 
   // do this after updating the hard fork state since the weight limit may change due to fork
   if (!update_next_cumulative_weight_limit())
