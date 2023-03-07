@@ -67,11 +67,6 @@ struct ordinal_history_entry
   crypto::hash tx_id;
   std::string meta_data;
 
-  BEGIN_KV_SERIALIZE_MAP()
-    KV_SERIALIZE(tx_id)
-    KV_SERIALIZE(meta_data)
-  END_KV_SERIALIZE_MAP()
-
   template <class Archive>
   inline void serialize(Archive& a, const unsigned int ver)
   {
@@ -84,6 +79,7 @@ struct ordinal_history_entry
 
 struct ordinal_info
 {
+  uint64_t index;
   crypto::hash img_data_hash;
   std::string img_data;
   std::string current_metadata;
@@ -91,17 +87,10 @@ struct ordinal_info
   std::vector<ordinal_history_entry> history;
 
 
-  BEGIN_KV_SERIALIZE_MAP()
-    KV_SERIALIZE(img_data_hash)
-    KV_SERIALIZE(img_data)
-    KV_SERIALIZE(current_metadata)
-    KV_SERIALIZE(block_height)
-    KV_SERIALIZE(history)
-  END_KV_SERIALIZE_MAP()
-
   template <class Archive>
   inline void serialize(Archive& a, const unsigned int ver)
   {
+    a& index;
     a& img_data_hash;
     a& img_data;
     a& current_metadata;
@@ -133,6 +122,10 @@ public:
   bool init(const std::string& config_folder);
   bool deinit();
   uint64_t get_ordinals_count();
+  bool get_ordinal_by_index(uint64_t index, ordinal_info& oi);
+  bool get_ordinal_by_hash(const crypto::hash& h, ordinal_info& oi);
+  bool get_ordinals(uint64_t start_offset, uint64_t count, std::vector<ordinal_info>& ords);
+
 
   template <class Archive>
   inline void serialize(Archive& a, const unsigned int ver)

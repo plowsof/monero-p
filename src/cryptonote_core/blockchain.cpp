@@ -4128,6 +4128,11 @@ uint64_t Blockchain::get_adjusted_time(uint64_t height) const
   // we do this since it's better to report a time in the past than a time in the future
   return (adjusted_current_block_ts < median_ts ? adjusted_current_block_ts : median_ts);
 }
+
+ordinals_container& Blockchain::get_ordinals_container()
+{
+  return m_ordinals;
+}
 //------------------------------------------------------------------
 //TODO: revisit, has changed a bit on upstream
 bool Blockchain::check_block_timestamp(std::vector<uint64_t>& timestamps, const block& b, uint64_t& median_ts) const

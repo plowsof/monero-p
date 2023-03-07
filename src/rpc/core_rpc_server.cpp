@@ -3614,6 +3614,80 @@ namespace cryptonote
     res.status = CORE_RPC_STATUS_OK;
     return true;
   }
+
+  bool ordinal_info_to_rpc(const ordinal_info& ord_info, ordinal_rpc_info& ordin_rpc_info)
+  {
+    ordin_rpc_info.current_meta_data = ord_info.current_metadata;
+    ordin_rpc_info.img_data_hex = epee::string_tools::buff_to_hex_nodelimer(ord_info.img_data);
+    ordin_rpc_info.ordinal_hash = epee::string_tools::pod_to_hex(ord_info.img_data_hash);
+    ordin_rpc_info.ordinal_id = ord_info.index;
+    ordin_rpc_info.history.resize(ord_info.history.size());
+    for (size_t i = 0; i != ord_info.history.size(); i++)
+    {
+      ordin_rpc_info.history[i].meta_data = ord_info.history[i].meta_data;
+      ordin_rpc_info.history[i].tx_id = epee::string_tools::pod_to_hex(ord_info.history[i].tx_id);
+    }
+    return true;
+  }
+
+  bool core_rpc_server::on_get_ordinal_details(const COMMAND_GET_ORDINAL_DETAILS::request& req, COMMAND_GET_ORDINAL_DETAILS::response& res, epee::json_rpc::error& error_resp, const connection_context* ctx)
+  {
+    ordinals_container& ordin = m_core.get_blockchain_storage().get_ordinals_container();
+    if (req.ordinal_hash.size() != 0)
+    {
+      // Requested ordinal by hash
+      crypto::hash ord_hash;
+      if (!epee::string_tools::hex_to_pod(req.ordinal_hash, ord_hash))
+      {
+        error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+        error_resp.message = "Invalid hash format";
+        return false;
+      }
+      ordinal_info ord_info;
+      if (!ordin.get_ordinal_by_hash(ord_hash, ord_info))
+      {
+        error_resp.code = CORE_RPC_ERROR_CODE_NOT_FOUND;
+        error_resp.message = "Hash not found";
+        return false;
+      }
+      ordinal_info_to_rpc(ord_info, static_cast<ordinal_rpc_info>(res));
+      res.status = CORE_RPC_STATUS_OK;
+      return true;
+    }
+    else
+    {
+      // Requested ordinal by index(id)
+
+      ordinal_info ord_info;
+      if (!ordin.get_ordinal_by_index(req.ordinal_id, ord_info))
+      {
+        error_resp.code = CORE_RPC_ERROR_CODE_NOT_FOUND;
+        error_resp.message = "Hash not found";
+        return false;
+      }
+      ordinal_info_to_rpc(ord_info, static_cast<ordinal_rpc_info>(res));
+      res.status = CORE_RPC_STATUS_OK;
+      return true;
+    }
+  }
+  bool core_rpc_server::on_get_ordinals_count(const COMMAND_GET_ORDINALS_COUNT::request& req, COMMAND_GET_ORDINALS_COUNT::response& res, epee::json_rpc::error& error_resp, const connection_context* ctx)
+  {
+    res.count = m_core.get_blockchain_storage().get_ordinals_container().get_ordinals_count();
+    res.status = CORE_RPC_STATUS_OK;
+    return true;
+  }
+  bool core_rpc_server::on_get_ordinals(const COMMAND_GET_ORDINALS::request& req, COMMAND_GET_ORDINALS::response& res, epee::json_rpc::error& error_resp, const connection_context* ctx)
+  {
+    std::vector<ordinal_info> ords;
+    m_core.get_blockchain_storage().get_ordinals_container().get_ordinals(req.start_from, req.count, ords);
+    res.ordinals.resize(ords.size());
+    for (size_t i = 0; i != ords.size(); i++)
+    {
+      ordinal_info_to_rpc(ords[i], res.ordinals[i]);
+    }
+    res.status = CORE_RPC_STATUS_OK;
+    return true;
+  }
   //------------------------------------------------------------------------------------------------------------------------------
   const command_line::arg_descriptor<std::string, false, true, 2> core_rpc_server::arg_rpc_bind_port = {
       "rpc-bind-port"

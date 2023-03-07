@@ -78,6 +78,7 @@ bool ordinals_container::on_push_transaction(const cryptonote::transaction& tx, 
   
   m_ordinals.push_back(ordinal_info());
   ordinal_info& entry = m_ordinals.back();
+  entry.index = m_ordinals.size() - 1;
   entry.img_data_hash = ordinal_data_hash;
   entry.img_data = ordinal_reg.img_data;
   entry.current_metadata = ordinal_reg.meta_data;
@@ -186,4 +187,30 @@ bool ordinals_container::deinit()
 uint64_t ordinals_container::get_ordinals_count()
 {
   return m_ordinals.size();
+}
+
+bool ordinals_container::get_ordinal_by_index(uint64_t index, ordinal_info& oi)
+{
+  if (m_ordinals.size() <= index)
+    return false;
+  oi = m_ordinals[index];
+  return true;
+}
+bool ordinals_container::get_ordinal_by_hash(const crypto::hash& h, ordinal_info& oi)
+{
+  auto it_or = m_data_hash_to_ordinal.find(h);
+  if (it_or == m_data_hash_to_ordinal.end())
+  {
+    return false;
+  }
+  oi = m_ordinals[it_or->second];
+  return true;
+}
+bool ordinals_container::get_ordinals(uint64_t start_offset, uint64_t count, std::vector<ordinal_info>& ords)
+{
+  for (uint64_t i = start_offset; i < m_ordinals.size() && (i - start_offset) < count; i++)
+  {
+    ords.push_back(m_ordinals[i]);
+  }
+  return true;
 }

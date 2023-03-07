@@ -51,6 +51,8 @@
 #define CORE_RPC_ERROR_CODE_RESTRICTED            -19
 #define CORE_RPC_ERROR_CODE_UNSUPPORTED_BOOTSTRAP -20
 #define CORE_RPC_ERROR_CODE_PAYMENTS_NOT_ENABLED  -21
+#define CORE_RPC_ERROR_CODE_NOT_FOUND             -22
+
 
 static inline const char *get_rpc_server_error_message(int64_t code)
 {

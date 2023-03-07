@@ -184,6 +184,11 @@ namespace cryptonote
         MAP_JON_RPC_WE_IF("rpc_access_tracking", on_rpc_access_tracking,        COMMAND_RPC_ACCESS_TRACKING, !m_restricted)
         MAP_JON_RPC_WE_IF("rpc_access_data",     on_rpc_access_data,            COMMAND_RPC_ACCESS_DATA, !m_restricted)
         MAP_JON_RPC_WE_IF("rpc_access_account",  on_rpc_access_account,         COMMAND_RPC_ACCESS_ACCOUNT, !m_restricted)
+
+        MAP_JON_RPC_WE_IF("get_ordinal_details", on_get_ordinal_details,        COMMAND_GET_ORDINAL_DETAILS, !m_restricted)
+        MAP_JON_RPC_WE_IF("get_ordinals_count",  on_get_ordinals_count,         COMMAND_GET_ORDINALS_COUNT, !m_restricted)
+        MAP_JON_RPC_WE_IF("get_ordinals",        on_get_ordinals,               COMMAND_GET_ORDINALS, !m_restricted)
+
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -261,6 +266,10 @@ namespace cryptonote
     bool on_rpc_access_tracking(const COMMAND_RPC_ACCESS_TRACKING::request& req, COMMAND_RPC_ACCESS_TRACKING::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);
     bool on_rpc_access_data(const COMMAND_RPC_ACCESS_DATA::request& req, COMMAND_RPC_ACCESS_DATA::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);
     bool on_rpc_access_account(const COMMAND_RPC_ACCESS_ACCOUNT::request& req, COMMAND_RPC_ACCESS_ACCOUNT::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);
+
+    bool on_get_ordinal_details(const COMMAND_GET_ORDINAL_DETAILS::request& req, COMMAND_GET_ORDINAL_DETAILS::response& res, epee::json_rpc::error& error_resp, const connection_context* ctx = NULL);
+    bool on_get_ordinals_count(const COMMAND_GET_ORDINALS_COUNT::request& req, COMMAND_GET_ORDINALS_COUNT::response& res, epee::json_rpc::error& error_resp, const connection_context* ctx = NULL);
+    bool on_get_ordinals(const COMMAND_GET_ORDINALS::request& req, COMMAND_GET_ORDINALS::response& res, epee::json_rpc::error& error_resp, const connection_context* ctx = NULL);
     //-----------------------
 
 private:

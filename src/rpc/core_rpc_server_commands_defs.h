@@ -2741,4 +2741,108 @@ namespace cryptonote
     typedef epee::misc_utils::struct_init<response_t> response;
   };
 
+  struct ordinal_rpc_history_entry
+  {
+    std::string tx_id;
+    std::string meta_data;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(tx_id)
+      KV_SERIALIZE(meta_data)
+    END_KV_SERIALIZE_MAP()
+  }
+
+  struct ordinal_rpc_info
+  {
+    uint64_t ordinal_id;
+    std::string ordinal_hash;
+    std::string current_meta_data;
+    std::string img_data_hex;
+    std::vector<ordinal_rpc_history_entry> history;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(ordinal_id)
+      KV_SERIALIZE(ordinal_hash)
+      KV_SERIALIZE(current_meta_data)
+      KV_SERIALIZE(img_data_hex)
+      KV_SERIALIZE(history)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
+
+  struct COMMAND_GET_ORDINAL_DETAILS
+  {
+    struct request_t : public rpc_request_base
+    {
+      uint64_t ordinal_id;
+      std::string ordinal_hash;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_PARENT(rpc_request_base)
+        KV_SERIALIZE_OPT(ordinal_id, 0)
+        KV_SERIALIZE(ordinal_hash)
+      END_KV_SERIALIZE_MAP()
+    };
+    typedef epee::misc_utils::struct_init<request_t> request;
+
+    struct response_t : public rpc_response_base, public ordinal_rpc_info
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_PARENT(rpc_response_base)
+        KV_SERIALIZE_PARENT(ordinal_rpc_info)
+      END_KV_SERIALIZE_MAP()
+    };
+    typedef epee::misc_utils::struct_init<response_t> response;
+  };
+
+  struct COMMAND_GET_ORDINALS_COUNT
+  {
+    struct request_t : public rpc_request_base
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_PARENT(rpc_request_base)
+      END_KV_SERIALIZE_MAP()
+    };
+    typedef epee::misc_utils::struct_init<request_t> request;
+
+    struct response_t : public rpc_response_base
+    {
+      uint64_t count;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_PARENT(rpc_response_base)
+        KV_SERIALIZE(count)
+      END_KV_SERIALIZE_MAP()
+    };
+    typedef epee::misc_utils::struct_init<response_t> response;
+  };
+
+
+  struct COMMAND_GET_ORDINALS
+  {
+    struct request_t : public rpc_request_base
+    {
+      uint64_t start_from;
+      uint64_t count;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_PARENT(rpc_request_base)
+        KV_SERIALIZE(start_from)
+        KV_SERIALIZE(count)
+      END_KV_SERIALIZE_MAP()
+    };
+    typedef epee::misc_utils::struct_init<request_t> request;
+
+    struct response_t : public rpc_response_base
+    {
+      std::vector<ordinal_rpc_info> ordinals;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_PARENT(rpc_response_base)
+        KV_SERIALIZE(ordinals)
+      END_KV_SERIALIZE_MAP()
+    };
+    typedef epee::misc_utils::struct_init<response_t> response;
+  };
 }
