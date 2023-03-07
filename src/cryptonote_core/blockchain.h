@@ -129,6 +129,7 @@ namespace cryptonote
     /**
      * @brief Initialize the Blockchain state
      *
+     * @param config_folder path to folder that contains node data
      * @param db a pointer to the backing store to use for the blockchain
      * @param nettype network type
      * @param offline true if running offline, else false
@@ -138,11 +139,12 @@ namespace cryptonote
      *
      * @return true on success, false if any initialization steps fail
      */
-    bool init(BlockchainDB* db, const network_type nettype = MAINNET, bool offline = false, const cryptonote::test_options *test_options = NULL, difficulty_type fixed_difficulty = 0, const GetCheckpointsCallback& get_checkpoints = nullptr);
+    bool init(const std::string& config_folder, BlockchainDB* db, const network_type nettype = MAINNET, bool offline = false, const cryptonote::test_options *test_options = NULL, difficulty_type fixed_difficulty = 0, const GetCheckpointsCallback& get_checkpoints = nullptr);
 
     /**
      * @brief Initialize the Blockchain state
      *
+     * @param config_folder path to folder that contains node data
      * @param db a pointer to the backing store to use for the blockchain
      * @param hf a structure containing hardfork information
      * @param nettype network type
@@ -150,7 +152,7 @@ namespace cryptonote
      *
      * @return true on success, false if any initialization steps fail
      */
-    bool init(BlockchainDB* db, HardFork*& hf, const network_type nettype = MAINNET, bool offline = false);
+    bool init(const std::string& config_folder, BlockchainDB* db, HardFork*& hf, const network_type nettype = MAINNET, bool offline = false);
 
     /**
      * @brief Uninitializes the blockchain state

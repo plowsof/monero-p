@@ -125,6 +125,7 @@ target_link_libraries(rpc_base
     epee
     ${Boost_REGEX_LIBRARY}
     ${Boost_THREAD_LIBRARY}
+    ${Boost_SERIALIZATION_LIBRARY}
     ${Boost_PROGRAM_OPTIONS_LIBRARY}
   PRIVATE
     ${EXTRA_LIBRARIES})

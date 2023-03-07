@@ -275,7 +275,7 @@ uint64_t Blockchain::get_current_blockchain_height() const
 //------------------------------------------------------------------
 //FIXME: possibly move this into the constructor, to avoid accidentally
 //       dereferencing a null BlockchainDB pointer
-bool Blockchain::init(BlockchainDB* db, const network_type nettype, bool offline, const cryptonote::test_options *test_options, difficulty_type fixed_difficulty, const GetCheckpointsCallback& get_checkpoints/* = nullptr*/)
+bool Blockchain::init(const std::string& config_folder,  BlockchainDB* db, const network_type nettype, bool offline, const cryptonote::test_options *test_options, difficulty_type fixed_difficulty, const GetCheckpointsCallback& get_checkpoints/* = nullptr*/)
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
 
@@ -463,10 +463,35 @@ bool Blockchain::init(BlockchainDB* db, const network_type nettype, bool offline
       rx_set_main_seedhash(seedhash.data, tools::get_max_concurrency());
   }
 
-  if (!m_ordinals.init())
+  if (!m_ordinals.init(config_folder))
   {
     LOG_ERROR("Ordinals initialization failed");
     return false;
+  }
+  if (m_ordinals.get_block_height() == 0)
+  {
+    // need to resync 
+    uint64_t h = m_db->height();
+    if (h > ORDINAL_HEIGHT_START)
+    {
+      MWARNING("Ordinals: rescanning " << m_db->height() - ORDINAL_HEIGHT_START << " blocks...");
+      for (uint64_t h_ord = ORDINAL_HEIGHT_START; h_ord != m_db->height(); h_ord++)
+      {
+        block b_ord = m_db->get_block_from_height(h_ord);
+        for (const auto& tx_id : b_ord.tx_hashes)          
+        {
+          transaction ord_tx;
+          if (!m_db->get_tx(tx_id, ord_tx))
+          {
+            MERROR("Ordinals: resync history failed for block  " << h_ord << " and tx " << tx_id);
+            return false;
+          }
+          m_ordinals.on_push_transaction(ord_tx);
+        }
+        m_ordinals.set_block_height(b_ord);
+      }
+      MWARNING("Ordinals: rescanning finished! Current height is " << m_db->height());
+    }
   }
   if (m_db->height() != m_ordinals.get_block_height() + 1)
   {
@@ -478,11 +503,11 @@ bool Blockchain::init(BlockchainDB* db, const network_type nettype, bool offline
   return true;
 }
 //------------------------------------------------------------------
-bool Blockchain::init(BlockchainDB* db, HardFork*& hf, const network_type nettype, bool offline)
+bool Blockchain::init(const std::string& config_folder, BlockchainDB* db, HardFork*& hf, const network_type nettype, bool offline)
 {
   if (hf != nullptr)
     m_hardfork = hf;
-  bool res = init(db, nettype, offline, NULL);
+  bool res = init(config_folder, db, nettype, offline, NULL);
   if (hf == nullptr)
     hf = m_hardfork;
   return res;
@@ -667,7 +692,7 @@ block Blockchain::pop_block_from_blockchain()
     else
     {
       //updating ordinals
-      if (m_db->height() > 2833000)
+      if (m_db->height() > ORDINAL_HEIGHT_START)
       {
         m_ordinals.on_pop_transaction(tx);
       }
@@ -4555,7 +4580,7 @@ leave:
 
   TIME_MEASURE_FINISH(addblock);
   //updating ordinals
-  if (m_db->height() > 2833000)
+  if (m_db->height() > ORDINAL_HEIGHT_START)
   {
     for (auto it_txs = txs.begin(); it_txs != txs.end(); it_txs++)
     {

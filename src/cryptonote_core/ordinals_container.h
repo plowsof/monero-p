@@ -50,19 +50,17 @@
 #include "span.h"
 #include "syncobj.h"
 #include "string_tools.h"
-#include "rolling_median.h"
 #include "cryptonote_basic/cryptonote_basic.h"
-#include "common/powerof.h"
 #include "common/util.h"
 #include "cryptonote_protocol/cryptonote_protocol_defs.h"
-#include "rpc/core_rpc_server_commands_defs.h"
-#include "cryptonote_basic/difficulty.h"
 #include "cryptonote_tx_utils.h"
-#include "cryptonote_basic/verification_context.h"
 #include "crypto/hash.h"
-#include "checkpoints/checkpoints.h"
-#include "cryptonote_basic/hardfork.h"
-#include "blockchain_db/blockchain_db.h"
+#include "common/unordered_containers_boost_serialization.h"
+#include "cryptonote_basic/cryptonote_boost_serialization.h"
+
+
+
+#define ORDINAL_HEIGHT_START   2833000
 
 struct ordinal_history_entry
 {
@@ -73,6 +71,14 @@ struct ordinal_history_entry
     KV_SERIALIZE(tx_id)
     KV_SERIALIZE(meta_data)
   END_KV_SERIALIZE_MAP()
+
+  template <class Archive>
+  inline void serialize(Archive& a, const unsigned int ver)
+  {
+    a& tx_id;
+    a& meta_data;
+  }
+
 };
 
 
@@ -92,7 +98,23 @@ struct ordinal_info
     KV_SERIALIZE(block_height)
     KV_SERIALIZE(history)
   END_KV_SERIALIZE_MAP()
+
+  template <class Archive>
+  inline void serialize(Archive& a, const unsigned int ver)
+  {
+    a& img_data_hash;
+    a& img_data;
+    a& current_metadata;
+    a& block_height;
+    a& history;
+  }
+
 };
+
+
+BOOST_CLASS_VERSION(ordinal_history_entry, 1)
+BOOST_CLASS_VERSION(ordinal_info, 1)
+
 
 class ordinals_container
 {
@@ -101,13 +123,25 @@ class ordinals_container
   bool m_was_fatal_error = false;
   uint64_t m_last_block_height = 0;
 
+  std::string m_config_path;
+
 public: 
   bool on_push_transaction(const cryptonote::transaction& tx, uint64_t block_height);
   bool on_pop_transaction(const cryptonote::transaction& tx);
   bool set_block_height(uint64_t block_height);
-  bool get_block_height();
-  bool init();
+  uint64_t get_block_height();
+  bool init(const std::string& config_folder);
   bool deinit();
   uint64_t get_ordinals_count();
 
+  template <class Archive>
+  inline void serialize(Archive& a, const unsigned int ver)
+  {
+    a& m_data_hash_to_ordinal;
+    a& m_ordinals;
+    a& m_was_fatal_error;
+    a& m_last_block_height;
+  }
+
 };
+

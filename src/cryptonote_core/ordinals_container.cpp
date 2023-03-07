@@ -31,20 +31,26 @@
 
 
 #include "ordinals_container.h"
+#include <boost/filesystem.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+
+#define ORDINALS_CONFIG_FILENAME   "ordinals.arch"
 
 bool get_ordinal_register_entry(const cryptonote::transaction& tx, cryptonote::tx_extra_ordinal_register& ordinal_reg)
 {
 
-  if (!cryptonote::parse_tx_extra(tx.extra, tx_cache_data.tx_extra_fields))
+  std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+  if (!cryptonote::parse_tx_extra(tx.extra, tx_extra_fields))
   {
     // Extra may only be partially parsed, it's OK if tx_extra_fields contains public key
     LOG_PRINT_L0("Transaction extra has unsupported format: " << cryptonote::get_transaction_hash(tx));
-    if (tx_cache_data.tx_extra_fields.empty())
+    if (tx_extra_fields.empty())
       return false;
   }
 
 
-  if (find_tx_extra_field_by_type(tx_cache_data.tx_extra_fields, ordinal_reg))
+  if (find_tx_extra_field_by_type(tx_extra_fields, ordinal_reg))
   {
     return true;
   }
@@ -118,22 +124,64 @@ bool ordinals_container::on_pop_transaction(const cryptonote::transaction& tx)
 bool ordinals_container::set_block_height(uint64_t block_height)
 {
   m_last_block_height = block_height;
+  return true;
 }
 
-bool ordinals_container::get_block_height()
+uint64_t ordinals_container::get_block_height()
 {
   if (m_was_fatal_error)
     return 0;
   return m_last_block_height;
 }
 
-bool init()
+bool ordinals_container::init(const std::string& config_folder)
 {
+  m_config_path = config_folder;
+
+
+  boost::filesystem::ifstream ordinals_data;
+  ordinals_data.open(m_config_path + "/" + ORDINALS_CONFIG_FILENAME, std::ios_base::in| std::ios_base::binary);
+  if (ordinals_data.fail())
+  {
+    MWARNING("Ordinals config not found, starting as empty, need resync");
+    return true;
+  }
+  boost::archive::binary_iarchive boost_archive(ordinals_data);
+
+  boost_archive >> *this;
+  bool success = !ordinals_data.fail();
+  if (success)
+  {
+    MWARNING("Ordinals config loaded");
+  }
+  else
+  {
+    MWARNING("Error loading ordinals config");
+  }
+  return success;
 
 }
-bool deinit()
+bool ordinals_container::deinit()
 {
 
+  boost::filesystem::ofstream ordinals_data;
+  ordinals_data.open(m_config_path + "/" + ORDINALS_CONFIG_FILENAME, std::ios_base::out | std::ios_base::binary | std::ios::trunc);
+  if (ordinals_data.fail())
+    return false;
+
+  boost::archive::binary_oarchive boost_arch(ordinals_data);
+  boost_arch << *this;
+
+  bool success = !ordinals_data.fail();
+  if (success)
+  {
+    MWARNING("Ordinals config stored");
+  }
+  else
+  {
+    MWARNING("Error storing ordinals config");
+  }
+  return success;
 }
 uint64_t ordinals_container::get_ordinals_count()
 {
