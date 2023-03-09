@@ -1926,6 +1926,7 @@ void wallet2::scan_output(const cryptonote::transaction &tx, bool miner_tx, cons
 //----------------------------------------------------------------------------------------------------
 void wallet2::cache_tx_data(const cryptonote::transaction& tx, const crypto::hash &txid, tx_cache_data &tx_cache_data) const
 {
+
   if(!parse_tx_extra(tx.extra, tx_cache_data.tx_extra_fields))
   {
     // Extra may only be partially parsed, it's OK if tx_extra_fields contains public key
@@ -5581,6 +5582,42 @@ void wallet2::generate_chacha_key_from_password(const epee::wipeable_string &pas
   crypto::generate_chacha_key(pass.data(), pass.size(), key, m_kdf_rounds);
 }
 //----------------------------------------------------------------------------------------------------
+
+// self check of serialization 
+/*
+bool check_serialzation_to_extra()
+{
+  using namespace cryptonote;
+  transaction tx;
+  tx_extra_pub_key pk;
+  std::memset(&pk.pub_key, 0, sizeof(&pk.pub_key));
+  cryptonote::add_type_to_extra(tx.extra, pk);
+
+  tx_extra_nonce ex_n;
+  ex_n.nonce.resize(10, 'n');
+  cryptonote::add_type_to_extra(tx.extra, ex_n);
+
+  tx_extra_ordinal_register ordinal;
+  ordinal.img_data.resize(1006, 'x');
+  ordinal.meta_data.resize(20, 'y');
+
+  cryptonote::add_type_to_extra(tx.extra, ordinal);
+
+  std::vector<tx_extra_field> tx_extra_fields;
+
+
+  if (!parse_tx_extra(tx.extra, tx_extra_fields))
+  {
+    // Extra may only be partially parsed, it's OK if tx_extra_fields contains public key
+    LOG_PRINT_L0("Transaction extra has unsupported format: ");
+    return false;
+  }
+  LOG_PRINT_L0("ok");
+  return true;
+}
+*/
+
+
 void wallet2::load(const std::string& wallet_, const epee::wipeable_string& password, const std::string& keys_buf, const std::string& cache_buf)
 {
   clear();

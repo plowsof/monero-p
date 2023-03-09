@@ -2750,7 +2750,7 @@ namespace cryptonote
       KV_SERIALIZE(tx_id)
       KV_SERIALIZE(meta_data)
     END_KV_SERIALIZE_MAP()
-  }
+  };
 
   struct ordinal_rpc_info
   {
@@ -2780,7 +2780,7 @@ namespace cryptonote
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_PARENT(rpc_request_base)
-        KV_SERIALIZE_OPT(ordinal_id, 0)
+        KV_SERIALIZE(ordinal_id)
         KV_SERIALIZE(ordinal_hash)
       END_KV_SERIALIZE_MAP()
     };

@@ -6792,6 +6792,15 @@ bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::stri
       return false;
     }
 
+    std::vector<tx_extra_field> tx_extra_fields;
+    if (!parse_tx_extra(ptx_vector[0].tx.extra, tx_extra_fields))
+    {
+      // Extra may only be partially parsed, it's OK if tx_extra_fields contains public key
+      LOG_PRINT_L0("Transaction extra has unsupported format: ");
+      return false;
+    } 
+    
+
     // if we need to check for backlog, check the worst case tx
     if (m_wallet->confirm_backlog())
     {

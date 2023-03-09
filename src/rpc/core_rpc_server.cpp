@@ -3650,7 +3650,7 @@ namespace cryptonote
         error_resp.message = "Hash not found";
         return false;
       }
-      ordinal_info_to_rpc(ord_info, static_cast<ordinal_rpc_info>(res));
+      ordinal_info_to_rpc(ord_info, static_cast<ordinal_rpc_info&>(res));
       res.status = CORE_RPC_STATUS_OK;
       return true;
     }
@@ -3665,7 +3665,7 @@ namespace cryptonote
         error_resp.message = "Hash not found";
         return false;
       }
-      ordinal_info_to_rpc(ord_info, static_cast<ordinal_rpc_info>(res));
+      ordinal_info_to_rpc(ord_info, static_cast<ordinal_rpc_info&>(res));
       res.status = CORE_RPC_STATUS_OK;
       return true;
     }

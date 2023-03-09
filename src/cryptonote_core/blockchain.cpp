@@ -486,9 +486,9 @@ bool Blockchain::init(const std::string& config_folder,  BlockchainDB* db, const
             MERROR("Ordinals: resync history failed for block  " << h_ord << " and tx " << tx_id);
             return false;
           }
-          m_ordinals.on_push_transaction(ord_tx);
+          m_ordinals.on_push_transaction(ord_tx, h_ord);
         }
-        m_ordinals.set_block_height(b_ord);
+        m_ordinals.set_block_height(h_ord);
       }
       MWARNING("Ordinals: rescanning finished! Current height is " << m_db->height());
     }

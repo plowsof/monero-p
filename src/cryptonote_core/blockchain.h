@@ -1125,6 +1125,8 @@ namespace cryptonote
      */
     uint64_t get_adjusted_time(uint64_t height) const;
 
+    ordinals_container& get_ordinals_container();
+
 #ifndef IN_UNIT_TESTS
   private:
 #endif
