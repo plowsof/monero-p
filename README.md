@@ -1,7 +1,33 @@
-# Monero
+# Monero Ordinals
 
 Copyright (c) 2014-2022 The Monero Project.  
+Copyright (c) 2023 The Monero Ordinals Project(mordinals.org).  
 Portions Copyright (c) 2012-2013 The Cryptonote developers.
+
+Monero, like any blockchain project, is based on the principle of an open decentralized ledger that guarantees consensus regarding transaction history. However, unlike classic projects like Bitcoin and Ethereum, Monero hides sensitive information from third-party observers, such as transaction participants' addresses, transaction amounts, and the connections between transactions.
+
+Initially, Monero was created as a system with fungible coins, and it is generally considered more fungible than classic blockchain projects due to its private qualities.
+
+The phenomenon of ordinals, which has gained popularity recently, synthetically overcomes this property by associating certain data with transaction outputs, turning them into a digital asset that resembles an NFT.
+
+Implementing ordinals in Monero seemed like an interesting and challenging idea to us. Challenging because the technology on which Monero is built is more complex, and implementing ordinals in the privacy protocol is quite an adventure. Interesting because Monero is perhaps the most community-driven project of all, same time having a very diverse community. We believe that there will be many people who will appreciate our efforts.
+
+
+## Technical details
+An "ordinal" is considered to be the output of a transaction (the 0th output) that contains special data (tx_extra_ordinal_register in the extra field) describing the fact that the output registers an ordinal, as well as storing any graphical and metadata associated with that ordinal. This data is open and transparent in transaction, so an ordinal explorer (https://mordinals.org) can use it to create a table of ordinals. The owner of the wallet to which the transaction output belongs is the owner of the ordinal. As is known, in the Monero blockchain, it is not possible to determine the address based on the transaction output, so we added a meta_info field where the owner can provide their contact information (if desired) or any other information.
+In order for such an output to be an ordinal and not just lifeless information sealed in the blockchain, we have defined a protocol for transferring the ordinal to a new owner, such that the ordinal explorer can track this. This protocol should allow for the tracking of the actual transition of the ordinal to another transaction (to the new owner), as opposed to using this output as a decoy. To do this, we have created several outputs that obviously burn coins (and could never be actually spent) - outputs on a zero key, such as in this transaction: https://localmonero.co/blocks/search/35ccad6e5f36a4320d1296ecb02ee34ce1591096658f236915943d2e55e43007 
+If only such outputs are specified in the set of decoys, then the ordinal explorer can confidently determine that a transition of the ordinal has occurred in a new transaction. This small tweak to the Monero protocol should not harm the overall privacy of the network, but allows us to organize the transfer of ordinals between community members.
+To register, transfer, and update your ordinals, use the wallet from our open-source project: https://github.com/mooonero/mordinals 
+The project has only just started, there is still much to be done in terms of development, infrastructure, and everything else, but you can already use this wallet to register your first mordinal. To do this, you need to launch the console wallet and, after it synchronizes, enter the following command:
+
+[wallet 2SFc3]: mint_ordinal 0.00001 /path/to/imp.png /path/to/meta.txt [destination_address]
+
+This command will mint an ordinal that will be owned by your wallet (or the destination_address wallet if you specified that field).
+IMPORTANT!!!! Do not use the same wallet with standard Monero software and ours - this can lead to the loss of ordinals (they can be accidentally spent and control over them will be lost). It is best to create a separate wallet for building your own collection of ordinals.
+
+Check out newly registered ordinals in explorer: mordinals.org
+
+Below is the original readme from Monero
 
 ## Table of Contents
 
