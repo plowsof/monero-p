@@ -7092,10 +7092,26 @@ bool simple_wallet::list_my_ordinals(const std::vector<std::string> &args_)
   std::map<uint64_t, tools::wallet2::wallet_ordinal> ords = m_wallet->get_my_ordinals();
   for(auto it = ords.begin(); it != ords.end(); it++)
   {
-    message_writer( console_color_cyan, false) <<
-        boost::format("%10u  %s") %
-        it->first %
-        epee::string_tools::pod_to_hex(it->second.ordinal_hash);
+    COMMAND_GET_ORDINAL_DETAILS::request req;
+    COMMAND_GET_ORDINAL_DETAILS::response res;
+    req.ordinal_hash = epee::string_tools::pod_to_hex(it->second.ordinal_hash);
+    bool r = m_wallet->invoke_http_json_rpc("/json_rpc", "get_ordinal_details", req, res);
+    if(!r)
+    {
+      message_writer( console_color_cyan, false) <<
+          boost::format("            %s") %
+          (epee::string_tools::pod_to_hex(it->second.ordinal_hash) + "   [Failed to fetch ordinal details]");      
+    }
+    else
+    {
+      message_writer( console_color_cyan, false) <<
+          boost::format("%10u  %s   %s") %
+          res.ordinal_id %
+          epee::string_tools::pod_to_hex(it->second.ordinal_hash) % 
+          res.history.back().tx_id
+          ;
+    }
+
   }
   message_writer( console_color_cyan, false) << "Total: " << ords.size() << " ordinals";
   return true;
