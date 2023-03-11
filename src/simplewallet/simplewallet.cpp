@@ -199,6 +199,7 @@ namespace
   const char* USAGE_TRANSFER("transfer [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] (<URI> | <address> <amount>) [<payment_id>]");
   const char* USAGE_BURN("burn <amount>");
   const char* USAGE_MINT_ORDINAL("mint_ordinal <amount_for_out> <path_to_img_data_file> <path_to_meta_file> [destination_address]");
+  const char* USAGE_LIST_MY_ORDINALS("list_my_ordinals");
   const char* USAGE_LOCKED_TRANSFER("locked_transfer [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] (<URI> | <addr> <amount>) <lockblocks> [<payment_id (obsolete)>]");
   const char* USAGE_LOCKED_SWEEP_ALL("locked_sweep_all [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] <address> <lockblocks> [<payment_id (obsolete)>]");
   const char* USAGE_SWEEP_ALL("sweep_all [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
@@ -3298,6 +3299,10 @@ simple_wallet::simple_wallet()
     m_cmd_binder.set_handler("mint_ordinal", boost::bind(&simple_wallet::on_command, this, &simple_wallet::mint_ordinal, _1),
                            tr(USAGE_MINT_ORDINAL),
                            tr("mint_ordinal <amount_for_out> <path_to_img_data_file> <path_to_meta_file> [destination_address]"));
+    m_cmd_binder.set_handler("list_my_ordinals", boost::bind(&simple_wallet::on_command, this, &simple_wallet::list_my_ordinals, _1),
+                           tr(USAGE_LIST_MY_ORDINALS),
+                           tr("List ordinals that controlled by wallet"));
+
   m_cmd_binder.set_handler("locked_transfer",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::locked_transfer,_1),
                            tr(USAGE_LOCKED_TRANSFER),
@@ -6137,10 +6142,10 @@ bool simple_wallet::show_incoming_transfers(const std::vector<std::string>& args
         const std::pair<std::string, std::string> line = show_outputs_line(heights, blockchain_height, idx);
         extra_string += std::string("\n    ") + tr("Used at heights: ") + line.first + "\n    " + line.second;
       }
-      message_writer(td.m_spent ? console_color_magenta : console_color_green, false) <<
+      message_writer(td.m_is_ordinal ? console_color_cyan : (td.m_spent ? console_color_magenta : console_color_green), false) <<
         boost::format("%21s%8s%12s%8s%16u%68s%16u%s") %
         print_money(td.amount()) %
-        (td.m_spent ? tr("T") : tr("F")) %
+        (td.m_is_ordinal ? "O" : (td.m_spent ? tr("T") : tr("F"))) %
         (m_wallet->frozen(td) ? tr("[frozen]") : m_wallet->is_transfer_unlocked(td) ? tr("unlocked") : tr("locked")) %
         (td.is_rct() ? tr("RingCT") : tr("-")) %
         td.m_global_output_index %
@@ -7081,6 +7086,19 @@ bool simple_wallet::mint_ordinal(const std::vector<std::string>& args_)
   main_args.push_back(args_[0]);
   return transfer_main(Transfer, main_args, false, false, true, ord_reg);
 
+}
+bool simple_wallet::list_my_ordinals(const std::vector<std::string> &args_)
+{
+  std::map<uint64_t, tools::wallet2::wallet_ordinal> ords = m_wallet->get_my_ordinals();
+  for(auto it = ords.begin(); it != ords.end(); it++)
+  {
+    message_writer( console_color_cyan, false) <<
+        boost::format("%10u  %s") %
+        it->first %
+        epee::string_tools::pod_to_hex(it->second.ordinal_hash);
+  }
+  message_writer( console_color_cyan, false) << "Total: " << ords.size() << " ordinals";
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::locked_transfer(const std::vector<std::string> &args_)

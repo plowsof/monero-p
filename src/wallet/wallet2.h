@@ -346,6 +346,7 @@ private:
       std::vector<rct::key> m_multisig_k;
       std::vector<multisig_info> m_multisig_info; // one per other participant
       std::vector<std::pair<uint64_t, crypto::hash>> m_uses;
+      bool m_is_ordinal = false;
 
       bool is_rct() const { return m_rct; }
       uint64_t amount() const { return m_amount; }
@@ -379,6 +380,8 @@ private:
         FIELD(m_multisig_k)
         FIELD(m_multisig_info)
         FIELD(m_uses)
+        VERSION_FIELD(1)
+        FIELD(m_is_ordinal)
       END_SERIALIZE()
     };
 
@@ -792,7 +795,12 @@ private:
 
     struct wallet_ordinal
     {
-        crypto::hash ordinal_hash; //hash of img data
+      crypto::hash ordinal_hash; //hash of img data
+      
+      BEGIN_SERIALIZE_OBJECT()
+        VERSION_FIELD(0)
+        FIELD(ordinal_hash)
+      END_SERIALIZE()
     };
 
 
@@ -1248,16 +1256,17 @@ private:
         return;
       }
       a & m_has_ever_refreshed_from_node;
-      if (ver < 31)
-      {
-          return;
-      }
-      a & m_ordinals;
+
     }
 
     BEGIN_SERIALIZE_OBJECT()
       MAGIC_FIELD("monero wallet cache")
-      VERSION_FIELD(1)
+      VERSION_FIELD(2)
+      if (version < 1)
+      {
+        //
+        return false;
+      }
       FIELD(m_blockchain)
       FIELD(m_transfers)
       FIELD(m_account_public_address)
@@ -1289,6 +1298,11 @@ private:
         return true;
       }
       FIELD(m_has_ever_refreshed_from_node)
+      if(version < 2)
+      {
+        return true;
+      }
+      FIELD(m_ordinals)
     END_SERIALIZE()
 
     /*!
@@ -1539,6 +1553,8 @@ private:
 
     bool is_synced();
 
+    std::map<uint64_t, wallet_ordinal> get_my_ordinals(); 
+
     std::vector<std::pair<uint64_t, uint64_t>> estimate_backlog(const std::vector<std::pair<double, double>> &fee_levels);
     std::vector<std::pair<uint64_t, uint64_t>> estimate_backlog(uint64_t min_tx_weight, uint64_t max_tx_weight, const std::vector<uint64_t> &fees);
 
@@ -1691,6 +1707,7 @@ private:
 
     static std::string get_default_daemon_address() { CRITICAL_REGION_LOCAL(default_daemon_address_lock); return default_daemon_address; }
 
+
   private:
     /*!
      * \brief  Stores wallet information to wallet file.
@@ -1828,7 +1845,7 @@ private:
     const std::vector<std::vector<tools::wallet2::multisig_info>> *m_multisig_rescan_info;
     const std::vector<std::vector<rct::key>> *m_multisig_rescan_k;
     serializable_unordered_map<crypto::public_key, crypto::key_image> m_cold_key_images;
-    std::map<uint64_t, wallet_ordinal> m_ordinals; //mapping: ordinal_id -> ordinal details
+    serializable_map<uint64_t, wallet_ordinal> m_ordinals; //mapping: ordinal_id -> ordinal details
 
     std::atomic<bool> m_run;
 

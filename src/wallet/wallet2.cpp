@@ -2221,12 +2221,18 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
             td.m_frozen = false;
             if (has_ordinal_entry && o == 0)
             {
-              //received ordinal!
-              m_callback->on_general_message("Ordinal received!");
-              //mark as spent to prevent it from being accidently used in regular transaction
+              // received ordinal!
+              if(m_callback)
+              {
+                m_callback->on_general_message("Ordinal received!");
+              }
+              // TODO: add validation with the daemon if ordinal legit
+              // mark as spent to prevent it from being accidently used in regular transaction
               td.m_spent = true;
+              td.m_is_ordinal = true;
               wallet_ordinal& wo = m_ordinals[m_transfers.size() - 1];
               wo.ordinal_hash = crypto::cn_fast_hash(ord_reg_data.img_data.data(), ord_reg_data.img_data.size());
+              MWARNING("Ordinal received! hash: " <<  wo.ordinal_hash);
             }
             else
             {
@@ -2544,6 +2550,11 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
     if (tx_notify)
       tx_notify->notify("%s", epee::string_tools::pod_to_hex(txid).c_str(), NULL);
   }
+}
+//----------------------------------------------------------------------------------------------------
+std::map<uint64_t, wallet2::wallet_ordinal> wallet2::get_my_ordinals()
+{
+  return m_ordinals;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_unconfirmed(const crypto::hash &txid, const cryptonote::transaction& tx, uint64_t height)
@@ -8519,7 +8530,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
 
         const auto it = existing_rings.find(td.m_key_image);
         const bool has_ring = it != existing_rings.end();
-        if (has_ring)
+        if ( has_ring)
         {
           const std::vector<uint64_t> &ring = it->second;
           MINFO("This output has a known ring, reusing (size " << ring.size() << ")");
@@ -9277,7 +9288,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
       if (sources_copy[idx].outputs[sources_copy[idx].real_output].second.dest == sources[n].outputs[sources[n].real_output].second.dest)
         ins_order.push_back(idx);
     }
-  }
+  } 
   THROW_WALLET_EXCEPTION_IF(ins_order.size() != sources.size(), error::wallet_internal_error, "Failed to work out sources permutation");
 
   std::vector<tools::wallet2::multisig_sig> multisig_sigs;

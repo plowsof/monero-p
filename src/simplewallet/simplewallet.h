@@ -174,6 +174,7 @@ namespace cryptonote
     bool transfer(const std::vector<std::string> &args);
     bool burn(const std::vector<std::string>& args_);
     bool mint_ordinal(const std::vector<std::string>& args_);
+    bool list_my_ordinals(const std::vector<std::string> &args_);
     bool locked_transfer(const std::vector<std::string> &args);
     bool locked_sweep_all(const std::vector<std::string> &args);
     bool sweep_main(uint32_t account, uint64_t below, bool locked, const std::vector<std::string> &args);
