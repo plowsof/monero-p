@@ -17,13 +17,53 @@ Implementing ordinals in Monero seemed like an interesting and challenging idea 
 An "ordinal" is considered to be the output of a transaction (the 0th output) that contains special data (tx_extra_ordinal_register in the extra field) describing the fact that the output registers an ordinal, as well as storing any graphical and metadata associated with that ordinal. This data is open and transparent in transaction, so an ordinal explorer (https://mordinals.org) can use it to create a table of ordinals. The owner of the wallet to which the transaction output belongs is the owner of the ordinal. As is known, in the Monero blockchain, it is not possible to determine the address based on the transaction output, so we added a meta_info field where the owner can provide their contact information (if desired) or any other information.
 In order for such an output to be an ordinal and not just lifeless information sealed in the blockchain, we have defined a protocol for transferring the ordinal to a new owner, such that the ordinal explorer can track this. This protocol should allow for the tracking of the actual transition of the ordinal to another transaction (to the new owner), as opposed to using this output as a decoy. To do this, we have created several outputs that obviously burn coins (and could never be actually spent) - outputs on a zero key, such as in this transaction: https://localmonero.co/blocks/search/35ccad6e5f36a4320d1296ecb02ee34ce1591096658f236915943d2e55e43007 
 If only such outputs are specified in the set of decoys, then the ordinal explorer can confidently determine that a transition of the ordinal has occurred in a new transaction. This small tweak to the Monero protocol should not harm the overall privacy of the network, but allows us to organize the transfer of ordinals between community members.
-To register, transfer, and update your ordinals, use the wallet from our open-source project: https://github.com/mooonero/mordinals 
-The project has only just started, there is still much to be done in terms of development, infrastructure, and everything else, but you can already use this wallet to register your first mordinal. To do this, you need to launch the console wallet and, after it synchronizes, enter the following command:
 
-[wallet 2SFc3]: mint_ordinal 0.00001 /path/to/imp.png /path/to/meta.txt [destination_address]
+## HOWTO Mint
+To mint and control your inscriptions, you will need to use our open-source wallet. Our wallet is a fork of Monero with a number of modifications that allow us to have ordinal protocol on top of the Monero blockchain. Here are a few simple steps that you need to follow to mint your ordinals:
+
+[1] Build the CLI wallet (targeting simplewallet in make) and the daemon. Detailed instructions on how to build the wallet can be found here: 
+
+`https://github.com/mooonero/mordinals#compiling-monero-from-source`
+
+
+[2]. Launch the daemon and wait until it is synchronized. You can download the Monero blockchain from https://www.getmonero.org/downloads/#blockchain to speed up the synchronization process. Alternatively, you can copy the blockchain from any other synchronized Monero node (just make sure to stop it first).
+
+
+[3]. Generate a new wallet using the command line. Remember to backup your seed phrase, as this is mandatory.
+
+`./monero-wallet-cli --generate-new-wallet=/home/wallets/my_mordinals.xmr`
+
+
+[4]. Open the wallet and synchronize it with the daemon.
+
+`./monero-wallet-cli --wallet-file=/home/wallets/my_mordinals.xmr`
+
+
+[5]. Tip this address with some funding (10-20$ equivalent should be enough) and wait for the required confirmations. Check that balance is confirmed be "balance" command:
+
+```
+[wallet 31yfs3]: balance
+Currently selected account: [0] Primary account
+Tag: (No tag assigned)
+Balance: 0.121121000000, unlocked balance: 0.121121000000
+```
+
+
+[6]. Prepare a .png image that you would like to use as your inscription, and create a .txt file where you can include some short text associated with your ordinal. Note that the text file can be left empty.
+
+
+[7]. Launch simplewallet and pass the following command to it:
+
+`[wallet 31yfs3]:  mint_ordinal 0.00001 /home/images/my_inscription.png /home/description.txt`
+
+
+[8]. Wait until the transaction is confirmed, and then check mordinals.com to see if your inscription has been recognized and registered.
+
+
+[9]. Bask in the glory of being inscribed in Monero's history!
 
 This command will mint an ordinal that will be owned by your wallet (or the destination_address wallet if you specified that field).
-IMPORTANT!!!! Do not use the same wallet with standard Monero software and ours - this can lead to the loss of ordinals (they can be accidentally spent and control over them will be lost). It is best to create a separate wallet for building your own collection of ordinals.
+**IMPORTANT!!!!** Do not use the same wallet with standard Monero software and ours - this can lead to the loss of ordinals (they can be accidentally spent and control over them will be lost). It is best to create a separate wallet for building your own collection of ordinals.
 
 Check out newly registered ordinals in explorer: mordinals.org
 
