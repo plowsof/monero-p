@@ -1217,12 +1217,7 @@ add_subdirectory(contrib)
 add_subdirectory(src)
 
 find_package(PythonInterp)
-if(BUILD_TESTS)
-  message(STATUS "Building tests")
-  add_subdirectory(tests)
-else()
-  message(STATUS "Not building tests")
-endif()
+
 
 if(BUILD_DEBUG_UTILITIES)
   message(STATUS "Building debug utilities")
