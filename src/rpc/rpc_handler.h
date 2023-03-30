@@ -89,7 +89,9 @@ public:
     , m_get_blocks(gbf)
     , m_get_block_id_by_height(gbibhf)
     , m_mutex()
-  {}
+  {
+    revert_to_hardfork_5_state();
+  }
 
   bool get_coinbase_output_distribution
   (
@@ -110,6 +112,8 @@ private:
   bool fetch_and_extend(uint64_t block_start_offset, size_t count, bool cache_front);
 
   void save_current_checkpoints();
+
+  void revert_to_hardfork_5_state();
 
   std::deque<uint64_t> m_num_cb_outs_per_block; // NOT cumulative like RCT offsets
   uint64_t m_height_begin; // inclusive

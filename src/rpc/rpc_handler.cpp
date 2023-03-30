@@ -138,14 +138,6 @@ namespace rpc
 
     rollback_for_reorgs();
 
-    if (m_num_cb_outs_per_block.empty())
-    {
-      // If we have nothing cached, we can adjust the cache start height to the first request.
-      // Since realistically, we will only use this cache for post-RCT coinbase blocks, we can save
-      // some space and DB fetching.
-      m_height_begin = start_height;
-    }
-
     const uint64_t num_missing_front = (start_height < m_height_begin) ? (m_height_begin - start_height) : 0;
     const uint64_t num_missing_back = (stop_height >= height_end()) ? (stop_height - height_end() + 1) : 0;
 
@@ -194,22 +186,22 @@ namespace rpc
 
     if (all_potent_invalid)
     {
-      m_num_cb_outs_per_block.clear();
+      revert_to_hardfork_5_state();
     }
     else if (top_99_potent_invalid)
     {
       for (size_t i = 0; i < 99; ++i) m_num_cb_outs_per_block.pop_back();
+      save_current_checkpoints();
     }
     else if (top_9_potent_invalid)
     {
       for (size_t i = 0; i < 9; ++i) m_num_cb_outs_per_block.pop_back();
+      save_current_checkpoints();
     }
     else
     {
       return; // Everything is valid! Nothing to do
     }
-
-    save_current_checkpoints();
   }
 
   bool CoinbaseOutputDistributionCache::fetch_and_extend
@@ -283,6 +275,22 @@ namespace rpc
     if (num_cached >= 1) m_last_1_hash = m_get_block_id_by_height(height_end() - 1);
     if (num_cached >= 10) m_last_10_hash = m_get_block_id_by_height(height_end() - 10);
     if (num_cached >= 100) m_last_100_hash = m_get_block_id_by_height(height_end() - 100);
+  }
+
+  void CoinbaseOutputDistributionCache::revert_to_hardfork_5_state()
+  {
+    // All blocks with height [ONE_CB_BEGIN, ONE_CB_END] have only a single miner tx output
+    // This saves us ~1.2 millon block fetches
+    static constexpr uint64_t ONE_CB_BEGIN = 1284000;
+    static constexpr uint64_t ONE_CB_END = 2437000;
+    static constexpr size_t ONE_CB_RANGE_SIZE = static_cast<size_t>(ONE_CB_END - ONE_CB_BEGIN);
+
+    m_height_begin = ONE_CB_BEGIN;
+    m_num_cb_outs_per_block = std::deque<uint64_t>(ONE_CB_RANGE_SIZE, 1);
+
+    CHECK_AND_ASSERT_THROW_MES(m_num_cb_outs_per_block.size() == ONE_CB_RANGE_SIZE, "fill");
+
+    save_current_checkpoints();
   }
 } // rpc
 } // cryptonote
