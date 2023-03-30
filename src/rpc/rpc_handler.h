@@ -30,6 +30,7 @@
 
 #include <boost/optional/optional.hpp>
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <vector>
 #include "byte_slice.h"
@@ -37,6 +38,7 @@
 
 namespace cryptonote
 {
+class block;
 class core;
 
 namespace rpc
@@ -47,6 +49,11 @@ struct output_distribution_data
   std::vector<std::uint64_t> distribution;
   std::uint64_t start_height;
   std::uint64_t base;
+
+  bool operator==(const output_distribution_data& rhs) const
+  {
+    return distribution == rhs.distribution && start_height == rhs.start_height && base == rhs.base;
+  }
 };
 
 class RpcHandler
@@ -61,6 +68,59 @@ class RpcHandler
       get_output_distribution(const std::function<bool(uint64_t, uint64_t, uint64_t, uint64_t&, std::vector<uint64_t>&, uint64_t&)> &f, uint64_t amount, uint64_t from_height, uint64_t to_height, const std::function<crypto::hash(uint64_t)> &get_hash, bool cumulative, uint64_t blockchain_height);
 };
 
+class CoinbaseOutputDistributionCache
+{
+public:
+  using get_blocks_f = std::function<bool(uint64_t, size_t, std::vector<block>&)>;
+  using get_block_id_by_height_f = std::function<crypto::hash(uint64_t)>;
+
+  template <class GetBlocksFunc, class GetBlockIdByHeightFunc>
+  CoinbaseOutputDistributionCache
+  (
+    GetBlocksFunc&& gbf,
+    GetBlockIdByHeightFunc&& gbibhf
+  )
+    : m_num_cb_outs_per_block()
+    , m_height_begin()
+    , m_last_1_hash()
+    , m_last_10_hash()
+    , m_last_100_hash()
+    , m_get_blocks(gbf)
+    , m_get_block_id_by_height(gbibhf)
+    , m_mutex()
+  {}
+
+  bool get_coinbase_output_distribution
+  (
+    uint64_t start_height, // inclusive
+    uint64_t stop_height, // inclusive
+    std::vector<uint64_t>& num_cb_outs_per_block,
+    bool* only_used_cache = nullptr
+  );
+
+private:
+  uint64_t height_end() const // exclusive
+  {
+    return m_height_begin + m_num_cb_outs_per_block.size();
+  };
+
+  void rollback_for_reorgs();
+
+  bool fetch_and_extend(uint64_t block_start_offset, size_t count, bool cache_front);
+
+  void save_current_checkpoints();
+
+  std::deque<uint64_t> m_num_cb_outs_per_block; // NOT cumulative like RCT offsets
+  uint64_t m_height_begin; // inclusive
+  crypto::hash m_last_1_hash;
+  crypto::hash m_last_10_hash;
+  crypto::hash m_last_100_hash;
+
+  get_blocks_f m_get_blocks;
+  get_block_id_by_height_f m_get_block_id_by_height;
+
+  std::mutex m_mutex;
+};
 
 }  // rpc
 

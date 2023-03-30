@@ -174,6 +174,11 @@ namespace cryptonote
     , m_was_bootstrap_ever_used(false)
     , disable_rpc_ban(false)
     , m_rpc_payment_allow_free_loopback(false)
+    , m_cb_out_dist_cache
+    (
+      [&cr](uint64_t a, size_t b, std::vector<block>& c) -> bool { return cr.get_blocks(a, b, c); },
+      [&cr](uint64_t a) -> crypto::hash { return cr.get_block_id_by_height(a); }
+    )
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::set_bootstrap_daemon(
@@ -3340,6 +3345,21 @@ namespace cryptonote
 
         res.distributions.push_back({std::move(*data), amount, "", req.binary, req.compress});
       }
+
+      if (req.coinbase)
+      {
+        std::vector<uint64_t> num_cb_outs_per_block;
+        const uint64_t t1 = epee::misc_utils::get_tick_count();
+        if (!m_cb_out_dist_cache.get_coinbase_output_distribution(req.from_height, req_to_height, num_cb_outs_per_block))
+        {
+          res.status = "Failed to get coinbase output distribution";
+          return true;
+        }
+        const uint64_t t2 = epee::misc_utils::get_tick_count();
+        const uint64_t elap = t2 - t1;
+        std::cout << "get_coinbase_output_distribution took " << elap << " ms" << std::endl;
+        res.coinbase_distribution = {{std::move(num_cb_outs_per_block), req.from_height, 0}, 0, "", req.binary, req.compress};
+      }
     }
     catch (const std::exception &e)
     {
@@ -3394,10 +3414,25 @@ namespace cryptonote
 
         res.distributions.push_back({std::move(*data), amount, "", req.binary, req.compress});
       }
+
+      if (req.coinbase)
+      {
+        std::vector<uint64_t> num_cb_outs_per_block;
+        const uint64_t t1 = epee::misc_utils::get_tick_count();
+        if (!m_cb_out_dist_cache.get_coinbase_output_distribution(req.from_height, req_to_height, num_cb_outs_per_block))
+        {
+          res.status = "Failed to get coinbase output distribution";
+          return true;
+        }
+        const uint64_t t2 = epee::misc_utils::get_tick_count();
+        const uint64_t elap = t2 - t1;
+        std::cout << "get_coinbase_output_distribution took " << elap << " ms" << std::endl;
+        res.coinbase_distribution = {{std::move(num_cb_outs_per_block), req.from_height, 0}, 0, "", req.binary, req.compress};
+      }
     }
     catch (const std::exception &e)
     {
-      res.status = "Failed to get output distribution";
+      res.status = "Failed to get output distribution: error thrown";
       return true;
     }
 
