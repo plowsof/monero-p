@@ -31,6 +31,7 @@
 #include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <deque>
+#include <mutex>
 #include <string>
 #include <vector>
 #include "byte_slice.h"
