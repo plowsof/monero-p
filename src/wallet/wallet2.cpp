@@ -8431,13 +8431,19 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         max_rct_index = std::max(max_rct_index, m_transfers[idx].m_global_output_index);
       }
 
-    // Contains cumulative number of miner tx outputs for each post-RCT block. Each element in
-    // coinbase_distribution corresponds to one block, and each block matches with rct_offsets.
-    std::vector<uint64_t> coinbase_distribution;
+    // Contains cumulative number of miner tx outputs / non-miner tx outputs, respectively, for each
+    // post-RCT block. Each element in these vectors corresponds to one block, and each block
+    // matches with rct_offsets.
+    std::vector<uint64_t> rct_coinbase_offsets;
+    std::vector<uint64_t> rct_non_coinbase_offsets;
 
-    if (has_rct && rct_offsets.empty()) {
-      THROW_WALLET_EXCEPTION_IF(!get_rct_distribution(rct_start_height, rct_offsets, coinbase_distribution),
-          error::get_output_distribution, "Could not obtain output distribution.");
+    if (has_rct) {
+      const bool r = get_rct_distribution(rct_start_height, rct_offsets, rct_coinbase_offsets);
+      THROW_WALLET_EXCEPTION_IF(!r, error::get_output_distribution, "Could not obtain output distribution.");
+
+      rct_non_coinbase_offsets.reserve(rct_offsets.size());
+      for (size_t i = 0; i < rct_offsets.size(); ++i)
+        rct_non_coinbase_offsets.push_back(rct_offsets[i] - rct_coinbase_offsets[i]);
     }
 
     if (has_rct)
@@ -8554,10 +8560,6 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
     // generate output indices to request
     COMMAND_RPC_GET_OUTPUTS_BIN::request req = AUTO_VAL_INIT(req);
     COMMAND_RPC_GET_OUTPUTS_BIN::response daemon_resp = AUTO_VAL_INIT(daemon_resp);
-
-    std::unique_ptr<gamma_picker> gamma;
-    if (has_rct)
-      gamma.reset(new gamma_picker(rct_offsets));
 
     size_t num_selected_transfers = 0;
     req.outputs.reserve(selected_transfers.size() * (base_requested_outputs_count + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW));
@@ -8760,21 +8762,61 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
           const char *type = "";
           if (amount == 0)
           {
-            THROW_WALLET_EXCEPTION_IF(!gamma, error::wallet_internal_error, "No gamma picker");
+            // Check whether this transfer is a coinbase enote or not.
+            auto rct_it = std::lower_bound(rct_offsets.cbegin(), rct_offsets.cend(),
+              td.m_global_output_index);
+            THROW_WALLET_EXCEPTION_IF(rct_it == rct_offsets.cend(), error::wallet_internal_error,
+              "Can't determine whether this transfer is coinbase or not b/c the index is too high");
+            const size_t block_offset = std::distance(rct_offsets.cbegin(), rct_it);
+            const uint64_t offset_base = block_offset ? rct_offsets[block_offset - 1] : 0;
+            const uint64_t index_inside_block = td.m_global_output_index - offset_base;
+            const uint64_t first_non_coinbase_in_block = rct_coinbase_offsets[block_offset] -
+              (block_offset ? rct_coinbase_offsets[block_offset - 1] : 0);
+            const bool transfer_is_coinbase = index_inside_block < first_non_coinbase_in_block;
+
+            // Create gamma picker for specifically coinbase or not coinbase to match this transfer
+            const std::vector<uint64_t>& our_dist = transfer_is_coinbase ?
+              rct_coinbase_offsets : rct_non_coinbase_offsets;
+            gamma_picker gamma(our_dist);
+
+            // This lambda takes an index as an argument and depending on transfer_is_coinbase,
+            // takes what the gamma picker picked and readjusts it back to a global enote index.
+            const auto readjust_to_global = [&](uint64_t i) -> uint64_t
+            {
+              // @TODO: THE LINES BELOW HERE IS TECHNICALLY WRONG. WE NEED TO COMPARE AGAINST
+              // gamma.get_num_rct_outs(). WAITING FOR PR #8794
+              if (i >= num_outs /*gamma.get_num_rct_outs()*/) return i; // pass bad picks right thru
+
+              const auto i_it = std::lower_bound(our_dist.cbegin(), our_dist.cend(), i);
+              //THROW_WALLET_EXCEPTION_IF(i_it == our_dist.cend(), error::wallet_internal_error,
+              //  "Can't find gamma picked index within little distribution");
+              const size_t block_offset = std::distance(rct_offsets.cbegin(), i_it);
+              const uint64_t dist_base = block_offset ? our_dist[block_offset - 1] : 0;
+              const uint64_t global_base = block_offset ? rct_offsets[block_offset - 1] : 0;
+              const uint64_t index_inside_dist_inside_block = i - dist_base;
+              // There's probably a simpler way to do this math
+              const uint64_t num_coinbase_in_block = rct_coinbase_offsets[block_offset] -
+              (block_offset ? rct_coinbase_offsets[block_offset - 1] : 0);
+              const uint64_t index_inside_block =  index_inside_dist_inside_block + 
+                (transfer_is_coinbase) ? 0 : num_coinbase_in_block;
+              const uint64_t global_index = global_base + index_inside_block;
+              return global_index;
+            };
+
             // gamma distribution
             if (num_found -1 < recent_outputs_count + pre_fork_outputs_count)
             {
-              do i = gamma->pick(); while (i >= segregation_limit[amount].first);
+              do i = readjust_to_global(gamma.pick()); while (i >= segregation_limit[amount].first);
               type = "pre-fork gamma";
             }
             else if (num_found -1 < recent_outputs_count + pre_fork_outputs_count + post_fork_outputs_count)
             {
-              do i = gamma->pick(); while (i < segregation_limit[amount].first || i >= num_outs);
+              do i = readjust_to_global(gamma.pick()); while (i < segregation_limit[amount].first || i >= num_outs);
               type = "post-fork gamma";
             }
             else
             {
-              do i = gamma->pick(); while (i >= num_outs);
+              do i = readjust_to_global(gamma.pick()); while (i >= num_outs);
               type = "gamma";
             }
           }
