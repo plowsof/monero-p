@@ -3310,37 +3310,57 @@ namespace cryptonote
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_get_output_distribution(const COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::request& req, COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx)
+  bool core_rpc_server::on_get_output_distribution_general(bool binary_endpoint, const COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::request& req, COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx)
   {
-    RPC_TRACKER(get_output_distribution);
-    bool r;
-    if (use_bootstrap_daemon_if_necessary<COMMAND_RPC_GET_OUTPUT_DISTRIBUTION>(invoke_http_mode::JON_RPC, "get_output_distribution", req, res, r))
-      return r;
+    std::string& resp_msg = binary_endpoint ? res.status : error_resp.message;
 
     const bool restricted = m_restricted && ctx;
     if (restricted && req.amounts != std::vector<uint64_t>(1, 0))
     {
       error_resp.code = CORE_RPC_ERROR_CODE_RESTRICTED;
-      error_resp.message = "Restricted RPC can only get output distribution for rct outputs. Use your own node.";
+      resp_msg = "Restricted RPC can only get output distribution for rct outputs. Use your own node.";
       return false;
     }
+    else if (binary_endpoint && !req.binary)
+    {
+      error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+      resp_msg = "Binary only call";
+      return true;
+    }
+    else if (req.cumulative && req.coinbase)
+    {
+      error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+      resp_msg = "The coinbase output distribution is not provided cumulatively";
+      return true;
+    }
 
-    size_t n_0 = 0, n_non0 = 0;
-    for (uint64_t amount: req.amounts)
-      if (amount) ++n_non0; else ++n_0;
-    CHECK_PAYMENT_MIN1(req, res, n_0 * COST_PER_OUTPUT_DISTRIBUTION_0 + n_non0 * COST_PER_OUTPUT_DISTRIBUTION, false);
+    const uint64_t top_block_height = m_core.get_current_blockchain_height() - 1;
+    if (req.to_height > top_block_height || req.from_height > top_block_height)
+    {
+      error_resp.code = CORE_RPC_ERROR_CODE_TOO_BIG_HEIGHT;
+      resp_msg = std::string("Current height is only ") + std::to_string(top_block_height);
+      return true;
+    }
 
     try
     {
       // 0 is placeholder for the whole chain
-      const uint64_t req_to_height = req.to_height ? req.to_height : (m_core.get_current_blockchain_height() - 1);
+      const uint64_t req_to_height = req.to_height ? req.to_height : top_block_height;
       for (uint64_t amount: req.amounts)
       {
-        auto data = rpc::RpcHandler::get_output_distribution([this](uint64_t amount, uint64_t from, uint64_t to, uint64_t &start_height, std::vector<uint64_t> &distribution, uint64_t &base) { return m_core.get_output_distribution(amount, from, to, start_height, distribution, base); }, amount, req.from_height, req_to_height, [this](uint64_t height) { return m_core.get_blockchain_storage().get_db().get_block_hash_from_height(height); }, req.cumulative, m_core.get_current_blockchain_height());
+        auto data = rpc::RpcHandler::get_output_distribution
+        (
+          [this](uint64_t amount, uint64_t from, uint64_t to, uint64_t &start_height, std::vector<uint64_t> &distribution, uint64_t &base)
+            { return m_core.get_output_distribution(amount, from, to, start_height, distribution, base); },
+          amount, req.from_height, req_to_height, [this](uint64_t height)
+            { return m_core.get_blockchain_storage().get_db().get_block_hash_from_height(height); },
+          req.cumulative, m_core.get_current_blockchain_height()
+        );
+
         if (!data)
         {
           error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
-          error_resp.message = "Failed to get output distribution";
+          resp_msg = "Failed to get output distribution";
           return false;
         }
 
@@ -3354,7 +3374,7 @@ namespace cryptonote
         const uint64_t t1 = epee::misc_utils::get_tick_count();
         if (!m_cb_out_dist_cache.get_coinbase_output_distribution(req.from_height, req_to_height, num_cb_outs_per_block, start_height))
         {
-          res.status = "Failed to get coinbase output distribution";
+          resp_msg = "Failed to get coinbase output distribution";
           return true;
         }
         const uint64_t t2 = epee::misc_utils::get_tick_count();
@@ -3366,12 +3386,23 @@ namespace cryptonote
     catch (const std::exception &e)
     {
       error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
-      error_resp.message = "Failed to get output distribution";
+      resp_msg = std::string("Failed to get output distribution: ") + e.what();
       return false;
     }
 
     res.status = CORE_RPC_STATUS_OK;
     return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_output_distribution(const COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::request& req, COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx)
+  {
+    RPC_TRACKER(get_output_distribution);
+
+    bool r;
+    if (use_bootstrap_daemon_if_necessary<COMMAND_RPC_GET_OUTPUT_DISTRIBUTION>(invoke_http_mode::JON_RPC, "get_output_distribution", req, res, r))
+      return r;
+
+    return on_get_output_distribution_general(false, req, res, error_resp, ctx);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_output_distribution_bin(const COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::request& req, COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::response& res, const connection_context *ctx)
@@ -3382,65 +3413,8 @@ namespace cryptonote
     if (use_bootstrap_daemon_if_necessary<COMMAND_RPC_GET_OUTPUT_DISTRIBUTION>(invoke_http_mode::BIN, "/get_output_distribution.bin", req, res, r))
       return r;
 
-    const bool restricted = m_restricted && ctx;
-    if (restricted && req.amounts != std::vector<uint64_t>(1, 0))
-    {
-      res.status = "Restricted RPC can only get output distribution for rct outputs. Use your own node.";
-      return false;
-    }
-
-    size_t n_0 = 0, n_non0 = 0;
-    for (uint64_t amount: req.amounts)
-      if (amount) ++n_non0; else ++n_0;
-    CHECK_PAYMENT_MIN1(req, res, n_0 * COST_PER_OUTPUT_DISTRIBUTION_0 + n_non0 * COST_PER_OUTPUT_DISTRIBUTION, false);
-
-    res.status = "Failed";
-
-    if (!req.binary)
-    {
-      res.status = "Binary only call";
-      return true;
-    }
-    try
-    {
-      // 0 is placeholder for the whole chain
-      const uint64_t req_to_height = req.to_height ? req.to_height : (m_core.get_current_blockchain_height() - 1);
-      for (uint64_t amount: req.amounts)
-      {
-        auto data = rpc::RpcHandler::get_output_distribution([this](uint64_t amount, uint64_t from, uint64_t to, uint64_t &start_height, std::vector<uint64_t> &distribution, uint64_t &base) { return m_core.get_output_distribution(amount, from, to, start_height, distribution, base); }, amount, req.from_height, req_to_height, [this](uint64_t height) { return m_core.get_blockchain_storage().get_db().get_block_hash_from_height(height); }, req.cumulative, m_core.get_current_blockchain_height());
-        if (!data)
-        {
-          res.status = "Failed to get output distribution";
-          return true;
-        }
-
-        res.distributions.push_back({std::move(*data), amount, "", req.binary, req.compress});
-      }
-
-      if (req.coinbase)
-      {
-        std::vector<uint64_t> num_cb_outs_per_block;
-        uint64_t start_height = 0;
-        const uint64_t t1 = epee::misc_utils::get_tick_count();
-        if (!m_cb_out_dist_cache.get_coinbase_output_distribution(req.from_height, req_to_height, num_cb_outs_per_block, start_height))
-        {
-          res.status = "Failed to get coinbase output distribution";
-          return true;
-        }
-        const uint64_t t2 = epee::misc_utils::get_tick_count();
-        const uint64_t elap = t2 - t1;
-        std::cout << "get_coinbase_output_distribution took " << elap << " ms" << std::endl;
-        res.coinbase_distribution = {{std::move(num_cb_outs_per_block), start_height, 0}, 0, "", req.binary, req.compress};
-      }
-    }
-    catch (const std::exception &e)
-    {
-      res.status = std::string("Failed to get output distribution: ") + e.what();
-      return true;
-    }
-
-    res.status = CORE_RPC_STATUS_OK;
-    return true;
+    epee::json_rpc::error error_resp;
+    return on_get_output_distribution_general(true, req, res, error_resp, ctx);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_prune_blockchain(const COMMAND_RPC_PRUNE_BLOCKCHAIN::request& req, COMMAND_RPC_PRUNE_BLOCKCHAIN::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx)
