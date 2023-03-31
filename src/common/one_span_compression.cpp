@@ -27,7 +27,6 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
-#include <iostream>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -35,18 +34,35 @@
 #include "varint.h"
 
 static constexpr unsigned char ONE_SPAN_BIT = 0x80;
+static constexpr unsigned char UNCOMMON_VALUE_MARKER = 0x7f;
+
+namespace
+{
+void histogram_increment(std::unordered_map<uint64_t, size_t>& histogram, uint64_t value)
+{
+    const auto hit = histogram.find(value);
+    if (hit != histogram.end())
+        hit->second++;
+    else
+        histogram.insert({value, 1});
+}
+} // anonymous namespace
 
 namespace tools
 {
 std::string compress_one_span_format(const std::vector<uint64_t>& data)
 {
     std::vector<std::pair<bool, uint64_t>> span_variants;
-    std::unordered_map<uint64_t, unsigned char> lookup_index_by_value;
+    std::unordered_map<uint64_t, size_t> value_histogram;
 
     std::string s;
-    s.resize(1 + 128 * 8 + data.size());
+    // table size byte + (max table elements + max varint size) +
+    // (uncommon value marker + max varint size) * numvals
+    s.resize(1 + 127 * 8 + 9 * data.size());
 
-    // Construct span_variants and lookup_index_by_value
+    // Construct span_variants and value histogram
+    // For each element in span variants if, the bool is true, decompression should insert x number
+    // of 1 elements. If the value is false, decompression should insert the value x itself
     uint64_t current_one_span = 0;
     for (const uint64_t v: data)
     {
@@ -59,61 +75,63 @@ std::string compress_one_span_format(const std::vector<uint64_t>& data)
             if (current_one_span)
             {
                 span_variants.push_back({true, current_one_span});
-                lookup_index_by_value.insert({current_one_span, lookup_index_by_value.size()});
+                histogram_increment(value_histogram, current_one_span);
                 current_one_span = 0;
             }
             span_variants.push_back({false, v});
-            lookup_index_by_value.insert({v, lookup_index_by_value.size()});
-        }
-        if (lookup_index_by_value.size() >= 128)
-        {
-            throw std::logic_error("data is too detailed and cannot be compressed well");
+            histogram_increment(value_histogram, v);
         }
     }
     if (current_one_span)
     {
         span_variants.push_back({true, current_one_span});
-        lookup_index_by_value.insert({current_one_span, lookup_index_by_value.size()});
-    }
-    if (lookup_index_by_value.size() >= 128)
-    {
-        throw std::logic_error("data is too detailed and cannot be compressed well");
+        histogram_increment(value_histogram, current_one_span);
     }
 
-    // Write length of lookup table as byte
-    unsigned char* p = reinterpret_cast<unsigned char*>(&s[0]);
-    *(p++) = static_cast<unsigned char>(lookup_index_by_value.size());
+    // Sort the histogram values by most values most commonly occurring
+    using hist_val_t = std::pair<uint64_t, size_t>;
+    std::vector<hist_val_t> sorted_histogram(value_histogram.cbegin(), value_histogram.cend());
+    std::sort(sorted_histogram.begin(), sorted_histogram.end(),
+        [](const hist_val_t& l, const hist_val_t& r) -> bool { return l.second > r.second; });
 
-    // Write values in lookup table in order as packed varints
-    for (unsigned char i = 0; i < lookup_index_by_value.size(); ++i)
+    // Calculate lookup table size and write it to the output
+    const uint8_t lookup_table_size = static_cast<uint8_t>(
+        std::min(sorted_histogram.size(), (size_t) 127));
+    uint8_t* p = reinterpret_cast<uint8_t*>(&s[0]);
+    *(p++) = lookup_table_size;
+
+    // Construct lookup table itself while writing it to the output as packed varint list
+    // The lookup table contains the 127 most common values in the span variants data
+    std::unordered_map<uint64_t, unsigned char> lookup_index_by_value;
+    for (uint8_t i = 0; i < lookup_table_size; ++i)
     {
-        const auto tval_it = std::find_if(lookup_index_by_value.cbegin(), lookup_index_by_value.cend(),
-            [i](const decltype(lookup_index_by_value)::value_type& vt) { return vt.second == i; });
-        if (tval_it == lookup_index_by_value.cend())
-        {
-            throw std::runtime_error("internal bug: reverse lookup table could not find index");
-        }
-        tools::write_varint(p, tval_it->first);
+        const uint64_t& val = sorted_histogram[i].first;
+        lookup_index_by_value.insert({val, i});
+        tools::write_varint(p, val);
     }
 
     // Write number of data elements as a varint
     tools::write_varint(p, data.size());
 
-    // Write values in span_variants as its index in the lookup table & ONE_SPAN_BIT if a 1-span
+    // Write values in span_variants as its index in the lookup table & ONE_SPAN_BIT if a 1-span OR
+    // write the ONE_SPAN_BIT (if 1-span) ored with UNCOMMON_VALUE_MARKER then the value as a varint
     for (const auto& pair : span_variants)
     {
-        unsigned char val_index = lookup_index_by_value[pair.second];
-        if (pair.first) // if one-span
+        const bool is_one_span = pair.first;
+        const uint64_t& v = pair.second;
+        const auto tabit = lookup_index_by_value.find(v);
+        uint8_t byte_head = is_one_span ? ONE_SPAN_BIT : 0;
+        if (tabit != lookup_index_by_value.end()) // common value
         {
-            val_index |= ONE_SPAN_BIT;
+            byte_head |= tabit->second;
+            *(p++) = byte_head;
         }
-        *(p++) = val_index;
-    }
-
-    if (p > reinterpret_cast<unsigned char*>(&s[0] + s.size()))
-    {
-        std::cerr << "horrible internal bug: buffer overflow in compress_one_span_format" << std::endl;
-        exit(EXIT_FAILURE);
+        else // uncommon value
+        {
+            byte_head |= UNCOMMON_VALUE_MARKER;
+            *(p++) = byte_head;
+            tools::write_varint(p, v);
+        }
     }
 
     s.resize(p - reinterpret_cast<unsigned char*>(&s[0]));
