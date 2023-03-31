@@ -35,6 +35,7 @@
 
 static constexpr unsigned char ONE_SPAN_BIT = 0x80;
 static constexpr unsigned char UNCOMMON_VALUE_MARKER = 0x7f;
+static constexpr size_t MAX_RESERVE_HINT = 3000000;
 
 namespace
 {
@@ -42,9 +43,13 @@ void histogram_increment(std::unordered_map<uint64_t, size_t>& histogram, uint64
 {
     const auto hit = histogram.find(value);
     if (hit != histogram.end())
+    {
         hit->second++;
+    }
     else
+    {
         histogram.insert({value, 1});
+    }
 }
 } // anonymous namespace
 
@@ -139,16 +144,15 @@ std::string compress_one_span_format(const std::vector<uint64_t>& data)
     return s;
 }
 
-// @TODO: we don't know how much to reserve
 std::vector<uint64_t> decompress_one_span_format(const std::string& compressed)
 {
     // Read table size as byte
     const unsigned char table_size = *reinterpret_cast<const unsigned char*>(compressed.data());
-    std::unordered_map<unsigned char, uint64_t> value_by_table_index;
 
-    // Read table values, construct lookup map, and read the number of data elements
+    // Read table values, construct lookup table, and read the number of data elements
+    uint64_t lookup_table[128] = {0};
     auto sit = compressed.cbegin() + 1;
-    uint64_t num_elements;
+    size_t num_elements;
     for (unsigned char i = 0; i <= table_size; ++i)
     {
         uint64_t tab_val;
@@ -164,34 +168,44 @@ std::vector<uint64_t> decompress_one_span_format(const std::string& compressed)
         }
         else
         {
-            value_by_table_index.insert({i, tab_val});
+            lookup_table[i] = tab_val;
         }
     }
 
     // Read in data values
     std::vector<uint64_t> data;
-    data.reserve(num_elements);
+    data.reserve(std::min(num_elements, MAX_RESERVE_HINT));
     for (; sit < compressed.cend(); ++sit)
     {
-        unsigned char tab_index = *reinterpret_cast<const unsigned char*>(&*sit);
-        const bool one_span = tab_index & ONE_SPAN_BIT;
-        tab_index &= ~ONE_SPAN_BIT;
-        const auto tab_it = value_by_table_index.find(tab_index);
-        if (tab_it == value_by_table_index.end())
+        unsigned char byte_head = *reinterpret_cast<const unsigned char*>(&*sit);
+        const bool one_span = byte_head & ONE_SPAN_BIT;
+        byte_head &= ~ONE_SPAN_BIT;
+
+        uint64_t encod_val;
+        if (byte_head != UNCOMMON_VALUE_MARKER) // common value
         {
-            throw std::runtime_error("Bad data lookup values");
+            encod_val = lookup_table[byte_head];
         }
-        const uint64_t data_value = tab_it->second;
+        else // uncommon value
+        {
+            const int nread = tools::read_varint(decltype(sit)(sit), compressed.cend(), encod_val);
+            if (nread < 0 || nread > 256)
+            {
+                throw std::runtime_error("Error reading uncommon varint data element");
+            }
+            std::advance(sit, nread);
+        }
+
         if (one_span)
         {
-            for (size_t i = 0; i < data_value; ++i)
+            for (uint64_t i = 0; i < encod_val; ++i)
             {
                 data.push_back(1);
             }
         }
         else
         {
-            data.push_back(data_value);
+            data.push_back(encod_val);
         }
     }
 
