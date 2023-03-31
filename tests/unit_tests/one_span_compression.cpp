@@ -32,54 +32,179 @@
 #include "gtest/gtest.h"
 
 #include "common/one_span_compression.h"
+#include "crypto/crypto.h"
+#include "string_tools.h"
 
-static void test_start_finish(const std::vector<uint64_t>& data)
+static std::string vec_to_string(const std::vector<uint64_t>& data)
 {
-    std::vector<uint64_t> decomp_data = tools::decompress_one_span_format(
-        tools::compress_one_span_format(data));
-    ASSERT_EQ(data, decomp_data);
+    std::string res = "{";
+    for (const auto& v : data) { res.append(std::to_string(v)); res.append(","); }
+    return res + "}";
 }
 
-TEST(GetRCTCoinbaseOutputDist, one_span_format_start_finish)
+static std::string compressed_to_string(const std::string& compressed)
 {
-    test_start_finish({1, 1, 1, 1, 1, 4, 1, 8, 1, 1, 2, 3});
-    test_start_finish({});
-    test_start_finish({7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7});
-    test_start_finish({1, 1, 1, 1, 1});
-    test_start_finish({0});
-    test_start_finish({1, 5, 7, 3, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 6, 3, 7, 3, 2});
-    test_start_finish({1});
-    test_start_finish({std::numeric_limits<uint64_t>::max()});
+    return epee::string_tools::buff_to_hex_nodelimer(compressed);
 }
 
-/*
-TEST(GetRCTCoinbaseOutputDist, one_span_format_testnet)
+static std::vector<uint64_t> ones_interspersed_with_noise
+(
+    size_t num_elems,
+    double percent_rand,
+    uint64_t rand_val_cap = std::numeric_limits<uint64_t>::max()
+)
 {
-    std::vector<uint64_t> mainnet_data;
-    std::ifstream ifs("tests/unit_tests/testnet2207000_2.number");
-    do
+    std::vector<uint64_t> data(num_elems, 1);
+
+    const size_t num_random = static_cast<size_t>(percent_rand * data.size());
+    for (size_t i = 0; i < num_random; ++i)
     {
-        uint64_t v;
-        if (ifs >> v)
-            mainnet_data.push_back(v);
-    } while (!ifs.eof());
-    std::cout << "Number of data elements: " << mainnet_data.size() << std::endl;
+        const size_t rand_i = crypto::rand<size_t>() % data.size();
+        const uint64_t rand_val = crypto::rand<uint64_t>() % rand_val_cap;
+        data[rand_i] = rand_val;
+    }
 
-    const std::string compressed_mainnet_data = compress_one_span_format(mainnet_data);
-    std::cout << "compressed length: " << compressed_mainnet_data.size() << std::endl;
-    std::ofstream ofs("get_rct_dist_compressed_testnet_2207_2.dat");
-    ofs.write(compressed_mainnet_data.data(), compressed_mainnet_data.size());
-    ofs.close();
-
-    std::cout << "Occurences of 1337: " << std::count(mainnet_data.begin(), mainnet_data.end(), 1337) << std::endl;
-
-
-    const std::vector<uint64_t> decompressed = decompress_one_span_format(compressed_mainnet_data);
-    EXPECT_EQ(mainnet_data, decompressed);
-
-    std::cout << "value at [176139]: " << mainnet_data[176139] << std::endl;
-    std::cout << "value at [176139]: " << decompressed[176139] << std::endl;
-
-    std::cout << "Occurences of 1337: " << std::count(decompressed.begin(), decompressed.end(), 1337) << std::endl;
+    return data;
 }
-*/
+
+static bool test_start_finish(const std::vector<uint64_t>& data)
+{
+    std::string compressed;
+    std::vector<uint64_t> decompressed;
+
+    try
+    {
+        compressed = tools::compress_one_span_format(data);
+        decompressed = tools::decompress_one_span_format(compressed);
+
+        if (decompressed == data)
+        {
+            return true;
+        }
+        else
+        {
+            std::cerr << "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" << std::endl;
+            std::cerr << "COMPRESSION CORRECTNESS FAILURE: NOT EQUAL" << std::endl;
+            std::cerr << "compressed result: " << compressed_to_string(compressed) << std::endl;
+            std::cerr << "output data: " << vec_to_string(decompressed) << std::endl;
+            std::cerr << "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" << std::endl;
+            return false;
+        }
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" << std::endl;
+        std::cerr << "COMPRESSION CORRECTNESS FAILURE: ERROR OCCURRED" << std::endl;
+        std::cerr << "error message: " << e.what() << std::endl;
+        std::cerr << "compressed result: " << compressed_to_string(compressed) << std::endl;
+        std::cerr << "output data: " << vec_to_string(decompressed) << std::endl;
+        std::cerr << "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" << std::endl;
+        return false;
+    }
+}
+
+static bool test_compressed_size(const std::vector<uint64_t>& data, size_t expected_size = 0)
+{
+    expected_size = expected_size ? expected_size : data.size(); // 1 byte per element
+    const std::string compressed = tools::compress_one_span_format(data);
+    return compressed.size() <= expected_size;
+}
+
+TEST(one_span_compression, start_finish_correctness)
+{
+    EXPECT_TRUE(test_start_finish({1, 1, 1, 1, 1, 4, 1, 8, 1, 1, 2, 3}));
+    EXPECT_TRUE(test_start_finish({}));
+    EXPECT_TRUE(test_start_finish({7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7}));
+    EXPECT_TRUE(test_start_finish({1, 1, 1, 1, 1}));
+    EXPECT_TRUE(test_start_finish({0}));
+    EXPECT_TRUE(test_start_finish({1, 5, 7, 3, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 6, 3, 7, 3, 2}));
+    EXPECT_TRUE(test_start_finish({1}));
+    EXPECT_TRUE(test_start_finish({std::numeric_limits<uint64_t>::max()}));
+    EXPECT_TRUE(test_start_finish({std::vector<uint64_t>(127, 1)}));
+    EXPECT_TRUE(test_start_finish({std::vector<uint64_t>(128, 1)}));
+    std::vector<uint64_t> ascending(1000, 0);
+    for (size_t i = 1; i < ascending.size(); ++i)
+    {
+        ascending[i] = ascending[i - 1] + 1;
+    }
+    EXPECT_TRUE(test_start_finish(ascending));
+
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.1, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.2, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.3, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.4, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.5, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.1, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.2, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.3, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.4, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.5, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.1, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.2, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.3, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.4, 10)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.5, 10)));
+
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.1, 25)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.2, 25)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.3, 25)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.4, 25)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.5, 25)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.1, 100)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.2, 100)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.3, 100)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.4, 100)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.5, 100)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.1, 100)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.2, 100)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.3, 100)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.4, 100)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.5, 100)));
+
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100000, 0.1, 2000)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100000, 0.2, 2000)));
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100000, 0.3, 2000)));
+
+    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000000, 0.1, 2000)));
+}
+
+TEST(one_span_compression, size)
+{
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100, 0.1, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100, 0.2, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100, 0.3, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100, 0.4, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100, 0.5, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000, 0.1, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000, 0.2, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000, 0.3, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000, 0.4, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000, 0.5, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(10000, 0.1, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(10000, 0.2, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(10000, 0.3, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(10000, 0.4, 10)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(10000, 0.5, 10)));
+
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100, 0.1, 25)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100, 0.2, 25)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100, 0.3, 25)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100, 0.4, 25)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100, 0.5, 25)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000, 0.1, 100)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000, 0.2, 100)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000, 0.3, 100)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000, 0.4, 100)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000, 0.5, 100)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(10000, 0.1, 100)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(10000, 0.2, 100)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(10000, 0.3, 100)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(10000, 0.4, 100)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(10000, 0.5, 100)));
+
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100000, 0.1, 2000)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100000, 0.2, 2000)));
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100000, 0.3, 2000)));
+
+    EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000000, 0.1, 2000)));
+}

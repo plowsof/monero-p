@@ -30,8 +30,12 @@
 #include <stdexcept>
 #include <unordered_map>
 
+#include "misc_log_ex.h"
 #include "one_span_compression.h"
 #include "varint.h"
+
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "onespan"
 
 static constexpr unsigned char ONE_SPAN_BIT = 0x80;
 static constexpr unsigned char UNCOMMON_VALUE_MARKER = 0x7f;
@@ -139,7 +143,13 @@ std::string compress_one_span_format(const std::vector<uint64_t>& data)
         }
     }
 
-    s.resize(p - reinterpret_cast<unsigned char*>(&s[0]));
+    const size_t actual_size = p - reinterpret_cast<unsigned char*>(&s[0]);
+    if (actual_size > s.size())
+    {
+        MFATAL("Buffer overflow in compress_one_span_format");
+        exit(EXIT_FAILURE);
+    }
+    s.resize(actual_size);
 
     return s;
 }
@@ -175,11 +185,13 @@ std::vector<uint64_t> decompress_one_span_format(const std::string& compressed)
     // Read in data values
     std::vector<uint64_t> data;
     data.reserve(std::min(num_elements, MAX_RESERVE_HINT));
-    for (; sit < compressed.cend(); ++sit)
+    while (sit < compressed.cend())
     {
         unsigned char byte_head = *reinterpret_cast<const unsigned char*>(&*sit);
         const bool one_span = byte_head & ONE_SPAN_BIT;
         byte_head &= ~ONE_SPAN_BIT;
+
+        ++sit;
 
         uint64_t encod_val;
         if (byte_head != UNCOMMON_VALUE_MARKER) // common value
