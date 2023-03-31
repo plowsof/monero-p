@@ -3435,7 +3435,7 @@ namespace cryptonote
     }
     catch (const std::exception &e)
     {
-      res.status = "Failed to get output distribution: error thrown";
+      res.status = std::string("Failed to get output distribution: ") + e.what();
       return true;
     }
 

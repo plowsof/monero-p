@@ -204,13 +204,9 @@ namespace rpc
 
   bool CoinbaseOutputDistributionCache::fetch_and_extend(const size_t count)
   {
-    const size_t pre_extend_size = m_num_cb_outs_per_block.size();
-    const uint64_t pre_extend_height_end = height_end();
-
-    m_num_cb_outs_per_block.reserve(pre_extend_size + count);
-
     // To save memory, and not hog blockchain locks, we only request MAX_GET_BLOCKS_CHUNK at a time.
     static constexpr size_t MAX_GET_BLOCKS_CHUNK = 1000;
+    const uint64_t pre_extend_height_end = height_end();
     for (size_t num_fetched = 0; num_fetched < count; num_fetched += MAX_GET_BLOCKS_CHUNK)
     {
       const size_t remaining = count - num_fetched;
@@ -235,9 +231,6 @@ namespace rpc
         m_num_cb_outs_per_block.push_back(b.miner_tx.vout.size());
       }
     }
-
-    const bool cache_size_matches_exp = m_num_cb_outs_per_block.size() == (pre_extend_size + count);
-    CHECK_AND_ASSERT_MES(cache_size_matches_exp, false, "internal bug: chunking size");
 
     if (count)
     {
@@ -268,7 +261,14 @@ namespace rpc
     }
 
     const auto hardcoded_dist = blocks::GetRCTCoinbaseOutputDist(m_net_type);
-    m_num_cb_outs_per_block = std::vector<uint64_t>(hardcoded_dist.cbegin(), hardcoded_dist.cend());
+    if (hardcoded_dist.size())
+    {
+      m_num_cb_outs_per_block = std::vector<uint64_t>{hardcoded_dist.cbegin(), hardcoded_dist.cend()};
+    }
+    else
+    {
+      m_num_cb_outs_per_block.clear();
+    }
 
     save_current_checkpoints();
 

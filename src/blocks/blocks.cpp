@@ -185,7 +185,7 @@ namespace blocks
     static const std::vector<uint64_t> stagenet_data(1252000, 1);
     static const std::vector<uint64_t> testnet_data = decompress_one_span_format(std::string(
       reinterpret_cast<const char*>(testnet_cb_dist), testnet_cb_dist_len));
-    static const std::vector<uint64_t> fakechain_data;
+    static const std::vector<uint64_t> fakechain_data{};
 
     switch (network)
     {
@@ -193,7 +193,7 @@ namespace blocks
       case cryptonote::TESTNET: return epee::to_span(testnet_data);
       case cryptonote::MAINNET: return epee::to_span(mainnet_data);
       case cryptonote::FAKECHAIN: return epee::to_span(fakechain_data);
-      default: return {};
+      default: throw std::logic_error("unrecognized network type");
     }
   }
 }
