@@ -176,6 +176,7 @@ namespace cryptonote
     , m_rpc_payment_allow_free_loopback(false)
     , m_cb_out_dist_cache
     (
+      cr.get_nettype(),
       [&cr](uint64_t a, size_t b, std::vector<block>& c) -> bool { return cr.get_blocks(a, b, c); },
       [&cr](uint64_t a) -> crypto::hash { return cr.get_block_id_by_height(a); }
     )

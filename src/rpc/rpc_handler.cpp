@@ -3,6 +3,7 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include "blocks/blocks.h"
 #include "cryptonote_core/cryptonote_core.h"
 
 namespace cryptonote
@@ -136,30 +137,30 @@ namespace rpc
 
     std::lock_guard<decltype(m_mutex)> ll(m_mutex);
 
+    if (start_height < m_height_begin)
+    {
+      MERROR("Request for height too low: " << start_height);
+      return false;
+    }
+
     rollback_for_reorgs();
 
-    const uint64_t num_missing_front = (start_height < m_height_begin) ? (m_height_begin - start_height) : 0;
-    const uint64_t num_missing_back = (stop_height >= height_end()) ? (stop_height - height_end() + 1) : 0;
+    const uint64_t nmissing = (stop_height >= height_end()) ? (stop_height - height_end() + 1) : 0;
 
     if (only_used_cache)
-      *only_used_cache = num_missing_front || num_missing_back;
+      *only_used_cache = nmissing;
 
-    if (!fetch_and_extend(start_height, num_missing_front, true))
-    {
-      return false;
-    }
-    else if (!fetch_and_extend(height_end(), num_missing_back, false))
+    if (!fetch_and_extend(nmissing))
     {
       return false;
     }
 
-    CHECK_AND_ASSERT_MES(m_height_begin <= start_height, false, "internal bug: extend front");
     CHECK_AND_ASSERT_MES(height_end() > stop_height, false, "internal bug: extend back");
 
     const size_t num_queried_blocks = stop_height - start_height + 1; // +1 since inclusive range
-    const auto res_begin = m_num_cb_outs_per_block.begin() + (start_height - m_height_begin);
+    const auto res_begin = m_num_cb_outs_per_block.data() + (start_height - m_height_begin); 
     const auto res_end = res_begin + num_queried_blocks;
-    num_cb_outs_per_block = {res_begin, res_end};
+    num_cb_outs_per_block = std::vector<uint64_t>(res_begin, res_end);
 
     return true;
   }
@@ -186,7 +187,7 @@ namespace rpc
 
     if (all_potent_invalid)
     {
-      revert_to_hardfork_5_state();
+      revert_to_hardcoded_rct_state();
     }
     else if (top_99_potent_invalid)
     {
@@ -204,62 +205,42 @@ namespace rpc
     }
   }
 
-  bool CoinbaseOutputDistributionCache::fetch_and_extend
-  (
-    const uint64_t block_start_offset,
-    const size_t count,
-    const bool cache_front
-  )
+  bool CoinbaseOutputDistributionCache::fetch_and_extend(const size_t count)
   {
-    CHECK_AND_ASSERT_MES(!(cache_front && count > m_height_begin), false, "Trying to extend front past 0");
+    const size_t pre_extend_size = m_num_cb_outs_per_block.size();
+    const uint64_t pre_extend_height_end = height_end();
 
-    std::vector<uint64_t> extension;
-    extension.reserve(count);
+    m_num_cb_outs_per_block.reserve(pre_extend_size + count);
 
     // To save memory, and not hog blockchain locks, we only request MAX_GET_BLOCKS_CHUNK at a time.
-    // However, we don't want to fetch part of the blocks, modify our cache accordingly, run into an
-    // issue, then abort in an inconsistent state. So, the variable extension will contain a compact
-    // list of only the values that are needed. Then, post-fetch, we add all the values in extension
-    // to our cache in one go.
     static constexpr size_t MAX_GET_BLOCKS_CHUNK = 1000;
     for (size_t num_fetched = 0; num_fetched < count; num_fetched += MAX_GET_BLOCKS_CHUNK)
     {
       const size_t remaining = count - num_fetched;
       const size_t chunk_size = std::min(remaining, MAX_GET_BLOCKS_CHUNK);
-      const size_t chunk_start = block_start_offset + num_fetched;
+      const size_t chunk_start = pre_extend_height_end + num_fetched;
 
       std::vector<block> blocks;
       if (!m_get_blocks(chunk_start, chunk_size, blocks))
       {
-        MERROR("Could not get blocks " << block_start_offset << "/+" << count);
+        MERROR("Could not get blocks " << chunk_start << "/+" << chunk_size);
+        if (num_fetched)
+        {
+          // If we have have modifications to the cache that succeeded previously, but fail fetching
+          // now, we can still use that previously fetched information
+          save_current_checkpoints();
+        }
         return false;
       }
 
       for (const auto& b : blocks)
       {
-        extension.push_back(b.miner_tx.vout.size());
+        m_num_cb_outs_per_block.push_back(b.miner_tx.vout.size());
       }
     }
 
-    CHECK_AND_ASSERT_MES(extension.size() == count, false, "internal bug: chunking wrong size");
-
-    if (cache_front)
-    {
-      for (auto it = extension.rbegin(); it < extension.rend(); ++it)
-      {
-        m_num_cb_outs_per_block.push_front(*it);
-      }
-
-      // Adding blocks to front of the deque changes our starting height
-      m_height_begin -= count;
-    }
-    else
-    {
-      for (auto it = extension.begin(); it < extension.end(); ++it)
-      {
-        m_num_cb_outs_per_block.push_back(*it);
-      }
-    }
+    const bool cache_size_matches_exp = m_num_cb_outs_per_block.size() == (pre_extend_size + count);
+    CHECK_AND_ASSERT_MES(cache_size_matches_exp, false, "internal bug: chunking size");
 
     if (count)
     {
@@ -277,20 +258,25 @@ namespace rpc
     if (num_cached >= 100) m_last_100_hash = m_get_block_id_by_height(height_end() - 100);
   }
 
-  void CoinbaseOutputDistributionCache::revert_to_hardfork_5_state()
+  void CoinbaseOutputDistributionCache::revert_to_hardcoded_rct_state()
   {
-    // All blocks with height [ONE_CB_BEGIN, ONE_CB_END] have only a single miner tx output
-    // This saves us ~1.2 millon block fetches
-    static constexpr uint64_t ONE_CB_BEGIN = 1284000;
-    static constexpr uint64_t ONE_CB_END = 2437000;
-    static constexpr size_t ONE_CB_RANGE_SIZE = static_cast<size_t>(ONE_CB_END - ONE_CB_BEGIN);
+    // Set m_height_begin to the height of the first block that RCT was enabled
+    switch (m_net_type)
+    {
+      case STAGENET: m_height_begin = stagenet_hard_forks[3].height; break;
+      case TESTNET: m_height_begin = testnet_hard_forks[3].height; break;
+      case MAINNET: m_height_begin = mainnet_hard_forks[3].height; break;
+      case FAKECHAIN: m_height_begin = 0; break;
+      default: throw std::logic_error("unrecognized network type");
+    }
 
-    m_height_begin = ONE_CB_BEGIN;
-    m_num_cb_outs_per_block = std::deque<uint64_t>(ONE_CB_RANGE_SIZE, 1);
-
-    CHECK_AND_ASSERT_THROW_MES(m_num_cb_outs_per_block.size() == ONE_CB_RANGE_SIZE, "fill");
+    const auto hardcoded_dist = blocks::GetRCTCoinbaseOutputDist(m_net_type);
+    m_num_cb_outs_per_block = std::vector<uint64_t>(hardcoded_dist.cbegin(), hardcoded_dist.cend());
 
     save_current_checkpoints();
+
+    // @TODO: check against expected checkpoints
+
   }
 } // rpc
 } // cryptonote

@@ -30,12 +30,12 @@
 
 #include <boost/optional/optional.hpp>
 #include <cstdint>
-#include <deque>
 #include <mutex>
 #include <string>
 #include <vector>
 #include "byte_slice.h"
 #include "crypto/hash.h"
+#include "cryptonote_config.h"
 
 namespace cryptonote
 {
@@ -78,6 +78,7 @@ public:
   template <class GetBlocksFunc, class GetBlockIdByHeightFunc>
   CoinbaseOutputDistributionCache
   (
+    network_type net_type,
     GetBlocksFunc&& gbf,
     GetBlockIdByHeightFunc&& gbibhf
   )
@@ -86,11 +87,12 @@ public:
     , m_last_1_hash()
     , m_last_10_hash()
     , m_last_100_hash()
+    , m_net_type(net_type)
     , m_get_blocks(gbf)
     , m_get_block_id_by_height(gbibhf)
     , m_mutex()
   {
-    revert_to_hardfork_5_state();
+    revert_to_hardcoded_rct_state();
   }
 
   bool get_coinbase_output_distribution
@@ -109,17 +111,18 @@ private:
 
   void rollback_for_reorgs();
 
-  bool fetch_and_extend(uint64_t block_start_offset, size_t count, bool cache_front);
+  bool fetch_and_extend(size_t count);
 
   void save_current_checkpoints();
 
-  void revert_to_hardfork_5_state();
+  void revert_to_hardcoded_rct_state();
 
-  std::deque<uint64_t> m_num_cb_outs_per_block; // NOT cumulative like RCT offsets
+  std::vector<uint64_t> m_num_cb_outs_per_block; // NOT cumulative like RCT offsets
   uint64_t m_height_begin; // inclusive
   crypto::hash m_last_1_hash;
   crypto::hash m_last_10_hash;
   crypto::hash m_last_100_hash;
+  network_type m_net_type;
 
   get_blocks_f m_get_blocks;
   get_block_id_by_height_f m_get_block_id_by_height;
