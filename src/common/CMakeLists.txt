@@ -38,6 +38,7 @@ set(common_sources
   util.cpp
   i18n.cpp
   notify.cpp
+  one_span_compression.cpp
   password.cpp
   perf_timer.cpp
   pruning.cpp

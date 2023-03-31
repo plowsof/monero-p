@@ -32,7 +32,6 @@ set(unit_tests_sources
   address_from_url.cpp
   base58.cpp
   blockchain_db.cpp
-  blocks.cpp
   block_queue.cpp
   block_reward.cpp
   bootstrap_node_selector.cpp
@@ -73,6 +72,7 @@ set(unit_tests_sources
   net.cpp
   node_server.cpp
   notify.cpp
+  one_span_compression.cpp
   output_distribution.cpp
   parse_amount.cpp
   pruning.cpp
