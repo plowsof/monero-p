@@ -3884,9 +3884,9 @@ bool wallet2::refresh(bool trusted_daemon, uint64_t & blocks_fetched, bool& rece
   return ok;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_rct_distribution(uint64_t &start_height, std::vector<uint64_t> &distribution)
+bool wallet2::get_rct_distribution(uint64_t &start_height, std::vector<uint64_t> &distribution, std::vector<uint64_t> &coinbase_distribution)
 {
-  MDEBUG("Requesting rct distribution");
+  MDEBUG("Requesting rct distribution and coinbase distribution");
 
   cryptonote::COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::request req = AUTO_VAL_INIT(req);
   cryptonote::COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::response res = AUTO_VAL_INIT(res);
@@ -3895,6 +3895,7 @@ bool wallet2::get_rct_distribution(uint64_t &start_height, std::vector<uint64_t>
   req.cumulative = false;
   req.binary = true;
   req.compress = true;
+  req.coinbase = true;
 
   bool r;
   try
@@ -3920,10 +3921,28 @@ bool wallet2::get_rct_distribution(uint64_t &start_height, std::vector<uint64_t>
     MWARNING("Failed to request output distribution: results are not for amount 0");
     return false;
   }
+  else if (res.coinbase_distribution.data.distribution.empty())
+  {
+    MWARNING("Did not receive coinbase distribution with normal distribution: daemon may not outdated");
+    return false;
+  }
+  else if (res.coinbase_distribution.data.start_height != res.distributions[0].data.start_height)
+  {
+    MWARNING("Received conflicing start heights from node while getting output distribution");
+    return false;
+  }
+  else if (res.coinbase_distribution.data.distribution.size() != res.distributions[0].data.distribution.size())
+  {
+    MWARNING("Received conflicing chain sizes from node while getting output distribution");
+    return false;
+  }
   for (size_t i = 1; i < res.distributions[0].data.distribution.size(); ++i)
     res.distributions[0].data.distribution[i] += res.distributions[0].data.distribution[i-1];
   start_height = res.distributions[0].data.start_height;
   distribution = std::move(res.distributions[0].data.distribution);
+  for (size_t i = 1; i < res.coinbase_distribution.data.distribution.size(); ++i)
+    res.coinbase_distribution.data.distribution[i] += res.coinbase_distribution.data.distribution[i-1];
+  coinbase_distribution = std::move(res.coinbase_distribution.data.distribution);
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -8412,8 +8431,12 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         max_rct_index = std::max(max_rct_index, m_transfers[idx].m_global_output_index);
       }
 
+    // Contains cumulative number of miner tx outputs for each post-RCT block. Each element in
+    // coinbase_distribution corresponds to one block, and each block matches with rct_offsets.
+    std::vector<uint64_t> coinbase_distribution;
+
     if (has_rct && rct_offsets.empty()) {
-      THROW_WALLET_EXCEPTION_IF(!get_rct_distribution(rct_start_height, rct_offsets),
+      THROW_WALLET_EXCEPTION_IF(!get_rct_distribution(rct_start_height, rct_offsets, coinbase_distribution),
           error::get_output_distribution, "Could not obtain output distribution.");
     }
 

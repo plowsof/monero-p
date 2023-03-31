@@ -3350,8 +3350,9 @@ namespace cryptonote
       if (req.coinbase)
       {
         std::vector<uint64_t> num_cb_outs_per_block;
+        uint64_t start_height = 0;
         const uint64_t t1 = epee::misc_utils::get_tick_count();
-        if (!m_cb_out_dist_cache.get_coinbase_output_distribution(req.from_height, req_to_height, num_cb_outs_per_block))
+        if (!m_cb_out_dist_cache.get_coinbase_output_distribution(req.from_height, req_to_height, num_cb_outs_per_block, start_height))
         {
           res.status = "Failed to get coinbase output distribution";
           return true;
@@ -3359,7 +3360,7 @@ namespace cryptonote
         const uint64_t t2 = epee::misc_utils::get_tick_count();
         const uint64_t elap = t2 - t1;
         std::cout << "get_coinbase_output_distribution took " << elap << " ms" << std::endl;
-        res.coinbase_distribution = {{std::move(num_cb_outs_per_block), req.from_height, 0}, 0, "", req.binary, req.compress};
+        res.coinbase_distribution = {{std::move(num_cb_outs_per_block), start_height, 0}, 0, "", req.binary, req.compress};
       }
     }
     catch (const std::exception &e)
@@ -3419,8 +3420,9 @@ namespace cryptonote
       if (req.coinbase)
       {
         std::vector<uint64_t> num_cb_outs_per_block;
+        uint64_t start_height = 0;
         const uint64_t t1 = epee::misc_utils::get_tick_count();
-        if (!m_cb_out_dist_cache.get_coinbase_output_distribution(req.from_height, req_to_height, num_cb_outs_per_block))
+        if (!m_cb_out_dist_cache.get_coinbase_output_distribution(req.from_height, req_to_height, num_cb_outs_per_block, start_height))
         {
           res.status = "Failed to get coinbase output distribution";
           return true;
@@ -3428,7 +3430,7 @@ namespace cryptonote
         const uint64_t t2 = epee::misc_utils::get_tick_count();
         const uint64_t elap = t2 - t1;
         std::cout << "get_coinbase_output_distribution took " << elap << " ms" << std::endl;
-        res.coinbase_distribution = {{std::move(num_cb_outs_per_block), req.from_height, 0}, 0, "", req.binary, req.compress};
+        res.coinbase_distribution = {{std::move(num_cb_outs_per_block), start_height, 0}, 0, "", req.binary, req.compress};
       }
     }
     catch (const std::exception &e)

@@ -116,6 +116,7 @@ namespace rpc
     const uint64_t start_height, // inclusive
     const uint64_t stop_height, // inclusive
     std::vector<uint64_t>& num_cb_outs_per_block,
+    uint64_t& true_start_height,
     bool* only_used_cache/* = nullptr*/
   )
   {
@@ -137,11 +138,7 @@ namespace rpc
 
     std::lock_guard<decltype(m_mutex)> ll(m_mutex);
 
-    if (start_height < m_height_begin)
-    {
-      MERROR("Request for height too low: " << start_height);
-      return false;
-    }
+    true_start_height = std::max(start_height, m_height_begin);
 
     rollback_for_reorgs();
 
@@ -157,8 +154,8 @@ namespace rpc
 
     CHECK_AND_ASSERT_MES(height_end() > stop_height, false, "internal bug: extend back");
 
-    const size_t num_queried_blocks = stop_height - start_height + 1; // +1 since inclusive range
-    const auto res_begin = m_num_cb_outs_per_block.data() + (start_height - m_height_begin); 
+    const size_t num_queried_blocks = stop_height - true_start_height + 1; // +1 since inclusive []
+    const auto res_begin = m_num_cb_outs_per_block.data() + (true_start_height - m_height_begin); 
     const auto res_end = res_begin + num_queried_blocks;
     num_cb_outs_per_block = std::vector<uint64_t>(res_begin, res_end);
 

@@ -100,6 +100,7 @@ public:
     uint64_t start_height, // inclusive
     uint64_t stop_height, // inclusive
     std::vector<uint64_t>& num_cb_outs_per_block,
+    uint64_t& true_start_height,
     bool* only_used_cache = nullptr
   );
 
