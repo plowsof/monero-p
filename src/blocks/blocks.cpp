@@ -39,7 +39,7 @@ namespace blocks
   {
     static const std::vector<uint64_t> mainnet_data = tools::decompress_one_span_format(std::string(
       reinterpret_cast<const char*>(mainnet_cb_dist), mainnet_cb_dist_len));
-    static const std::vector<uint64_t> stagenet_data(1252000, 1);
+    static const std::vector<uint64_t> stagenet_data(1287000, 1);
     static const std::vector<uint64_t> testnet_data = tools::decompress_one_span_format(std::string(
       reinterpret_cast<const char*>(testnet_cb_dist), testnet_cb_dist_len));
     static const std::vector<uint64_t> fakechain_data{};

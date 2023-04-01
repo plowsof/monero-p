@@ -2492,11 +2492,11 @@ namespace cryptonote
             {
               if (this_ref.one_span)
               {
-                const_cast<std::string&>(this_ref.compressed_data) = compress_integer_array(this_ref.data.distribution);
+                const_cast<std::string&>(this_ref.compressed_data) = tools::compress_one_span_format(this_ref.data.distribution);
               }
               else
               {
-                const_cast<std::string&>(this_ref.compressed_data) = tools::compress_one_span_format(this_ref.data.distribution);
+                const_cast<std::string&>(this_ref.compressed_data) = compress_integer_array(this_ref.data.distribution);
               }
               KV_SERIALIZE(compressed_data)
             }
@@ -2510,11 +2510,11 @@ namespace cryptonote
               KV_SERIALIZE(compressed_data)
               if (this_ref.one_span)
               {
-                const_cast<std::vector<uint64_t>&>(this_ref.data.distribution) = decompress_integer_array<uint64_t>(this_ref.compressed_data);
+                const_cast<std::vector<uint64_t>&>(this_ref.data.distribution) = tools::decompress_one_span_format(this_ref.compressed_data);
               }
               else
               {
-                const_cast<std::vector<uint64_t>&>(this_ref.data.distribution) = tools::decompress_one_span_format(this_ref.compressed_data);
+                const_cast<std::vector<uint64_t>&>(this_ref.data.distribution) = decompress_integer_array<uint64_t>(this_ref.compressed_data);
               }
             }
             else
