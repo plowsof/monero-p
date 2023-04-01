@@ -3380,7 +3380,7 @@ namespace cryptonote
         const uint64_t t2 = epee::misc_utils::get_tick_count();
         const uint64_t elap = t2 - t1;
         std::cout << "get_coinbase_output_distribution took " << elap << " ms" << std::endl;
-        res.coinbase_distribution = {{std::move(num_cb_outs_per_block), start_height, 0}, 0, "", req.binary, req.compress};
+        res.coinbase_distribution = {{std::move(num_cb_outs_per_block), start_height, 0}, 0, "", req.binary, req.compress, true};
       }
     }
     catch (const std::exception &e)

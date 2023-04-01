@@ -37,6 +37,7 @@
 #include "cryptonote_basic/difficulty.h"
 #include "crypto/hash.h"
 #include "rpc/rpc_handler.h"
+#include "common/one_span_compression.h"
 #include "common/varint.h"
 #include "common/perf_timer.h"
 
@@ -2469,6 +2470,7 @@ namespace cryptonote
       std::string compressed_data;
       bool binary;
       bool compress;
+      bool one_span; // Use one-span compression, good for coinbase output distributions
 
       bool operator==(const distribution& rhs) const
       {
@@ -2481,13 +2483,21 @@ namespace cryptonote
         KV_SERIALIZE_N(data.start_height, "start_height")
         KV_SERIALIZE(binary)
         KV_SERIALIZE(compress)
+        KV_SERIALIZE_OPT(one_span, false)
         if (this_ref.binary)
         {
           if (is_store)
           {
             if (this_ref.compress)
             {
-              const_cast<std::string&>(this_ref.compressed_data) = compress_integer_array(this_ref.data.distribution);
+              if (this_ref.one_span)
+              {
+                const_cast<std::string&>(this_ref.compressed_data) = compress_integer_array(this_ref.data.distribution);
+              }
+              else
+              {
+                const_cast<std::string&>(this_ref.compressed_data) = tools::compress_one_span_format(this_ref.data.distribution);
+              }
               KV_SERIALIZE(compressed_data)
             }
             else
@@ -2498,7 +2508,14 @@ namespace cryptonote
             if (this_ref.compress)
             {
               KV_SERIALIZE(compressed_data)
-              const_cast<std::vector<uint64_t>&>(this_ref.data.distribution) = decompress_integer_array<uint64_t>(this_ref.compressed_data);
+              if (this_ref.one_span)
+              {
+                const_cast<std::vector<uint64_t>&>(this_ref.data.distribution) = decompress_integer_array<uint64_t>(this_ref.compressed_data);
+              }
+              else
+              {
+                const_cast<std::vector<uint64_t>&>(this_ref.data.distribution) = tools::decompress_one_span_format(this_ref.compressed_data);
+              }
             }
             else
               KV_SERIALIZE_CONTAINER_POD_AS_BLOB_N(data.distribution, "distribution")
