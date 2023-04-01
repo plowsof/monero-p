@@ -68,7 +68,7 @@ static std::vector<uint64_t> ones_interspersed_with_noise
     return data;
 }
 
-static bool test_start_finish(const std::vector<uint64_t>& data)
+static bool test_start_finish(const std::vector<uint64_t>& data, bool show_output = true)
 {
     std::string compressed;
     std::vector<uint64_t> decompressed;
@@ -86,8 +86,11 @@ static bool test_start_finish(const std::vector<uint64_t>& data)
         {
             std::cerr << "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" << std::endl;
             std::cerr << "COMPRESSION CORRECTNESS FAILURE: NOT EQUAL" << std::endl;
-            std::cerr << "compressed result: " << compressed_to_string(compressed) << std::endl;
-            std::cerr << "output data: " << vec_to_string(decompressed) << std::endl;
+            if (show_output)
+            {
+                std::cerr << "compressed result: " << compressed_to_string(compressed) << std::endl;
+                std::cerr << "output data: " << vec_to_string(decompressed) << std::endl;
+            }
             std::cerr << "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" << std::endl;
             return false;
         }
@@ -97,8 +100,11 @@ static bool test_start_finish(const std::vector<uint64_t>& data)
         std::cerr << "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" << std::endl;
         std::cerr << "COMPRESSION CORRECTNESS FAILURE: ERROR OCCURRED" << std::endl;
         std::cerr << "error message: " << e.what() << std::endl;
-        std::cerr << "compressed result: " << compressed_to_string(compressed) << std::endl;
-        std::cerr << "output data: " << vec_to_string(decompressed) << std::endl;
+        if (show_output)
+        {
+            std::cerr << "compressed result: " << compressed_to_string(compressed) << std::endl;
+            std::cerr << "output data: " << vec_to_string(decompressed) << std::endl;
+        }
         std::cerr << "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" << std::endl;
         return false;
     }
@@ -131,6 +137,7 @@ TEST(one_span_compression, start_finish_correctness)
     EXPECT_TRUE(test_start_finish({std::numeric_limits<uint64_t>::max()}));
     EXPECT_TRUE(test_start_finish({std::vector<uint64_t>(127, 1)}));
     EXPECT_TRUE(test_start_finish({std::vector<uint64_t>(128, 1)}));
+
     std::vector<uint64_t> ascending(1000, 0);
     for (size_t i = 1; i < ascending.size(); ++i)
     {
@@ -138,43 +145,21 @@ TEST(one_span_compression, start_finish_correctness)
     }
     EXPECT_TRUE(test_start_finish(ascending));
 
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.1, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.2, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.3, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.4, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.5, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.1, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.2, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.3, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.4, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.5, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.1, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.2, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.3, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.4, 10)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.5, 10)));
+    std::vector<uint64_t> utterly_random;
+    utterly_random.reserve(1000000);
+    for (size_t i = 0; i < 1000000; ++i)
+    {
+        utterly_random.push_back(crypto::rand<uint64_t>());
+    }
+    EXPECT_TRUE(test_start_finish(utterly_random, false));
 
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.1, 25)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.2, 25)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.3, 25)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.4, 25)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100, 0.5, 25)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.1, 100)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.2, 100)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.3, 100)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.4, 100)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000, 0.5, 100)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.1, 100)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.2, 100)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.3, 100)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.4, 100)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(10000, 0.5, 100)));
-
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100000, 0.1, 2000)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100000, 0.2, 2000)));
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(100000, 0.3, 2000)));
-
-    EXPECT_TRUE(test_start_finish(ones_interspersed_with_noise(1000000, 0.1, 2000)));
+    std::vector<uint64_t> max_vals;
+    utterly_random.reserve(10000);
+    for (size_t i = 0; i < 10000; ++i)
+    {
+        max_vals.push_back(std::numeric_limits<uint64_t>::max());
+    }
+    EXPECT_TRUE(test_start_finish(max_vals, false));
 }
 
 TEST(one_span_compression, size)

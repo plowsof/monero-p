@@ -197,9 +197,9 @@ std::vector<uint64_t> decompress_one_span_format(const std::string& compressed)
     {
         throw std::runtime_error("Empty compressed string is invalid");
     }
-    else if (compressed.size() > MAX_DECOMPRESS_SIZE)
+    else if (compressed.size() > 11 * MAX_DECOMPRESS_SIZE) // 10x b/c max varint size + marker
     {
-        throw std::runtime_error("Decompresses to too many elements");
+        throw std::runtime_error("Compressed string is too large");
     }
 
     // Read table size as byte
@@ -222,7 +222,7 @@ std::vector<uint64_t> decompress_one_span_format(const std::string& compressed)
 
     if (num_elements > MAX_DECOMPRESS_SIZE)
     {
-        throw std::runtime_error("Decompresses to too many elements");
+        throw std::runtime_error("Given size decompresses to too many elements");
     }
 
     // Read in data values
@@ -259,7 +259,7 @@ std::vector<uint64_t> decompress_one_span_format(const std::string& compressed)
         {
             if (encod_val > MAX_DECOMPRESS_SIZE || MAX_DECOMPRESS_SIZE - encod_val < data.size())
             {
-                throw std::runtime_error("Decompresses to too many elements");
+                throw std::runtime_error("One span decompresses to too many elements");
             }
             for (uint64_t i = 0; i < encod_val; ++i)
             {
@@ -273,7 +273,7 @@ std::vector<uint64_t> decompress_one_span_format(const std::string& compressed)
 
         if (data.size() > MAX_DECOMPRESS_SIZE)
         {
-            throw std::runtime_error("Decompresses to too many elements");
+            throw std::runtime_error("Already decompressed to too many elements");
         }
     }
 
