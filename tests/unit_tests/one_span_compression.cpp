@@ -32,6 +32,7 @@
 #include "gtest/gtest.h"
 
 #include "common/one_span_compression.h"
+#include "common/varint.h"
 #include "crypto/crypto.h"
 #include "string_tools.h"
 
@@ -108,6 +109,14 @@ static bool test_compressed_size(const std::vector<uint64_t>& data, size_t expec
     expected_size = expected_size ? expected_size : data.size(); // 1 byte per element
     const std::string compressed = tools::compress_one_span_format(data);
     return compressed.size() <= expected_size;
+}
+
+static size_t size_of_varint(const uint64_t v)
+{
+    std::string s(10, '\0');
+    unsigned char* p = reinterpret_cast<unsigned char*>(&s[0]);
+    tools::write_varint(p, v);
+    return p - reinterpret_cast<unsigned char*>(&s[0]);
 }
 
 TEST(one_span_compression, start_finish_correctness)
@@ -207,4 +216,41 @@ TEST(one_span_compression, size)
     EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(100000, 0.3, 2000)));
 
     EXPECT_TRUE(test_compressed_size(ones_interspersed_with_noise(1000000, 0.1, 2000)));
+}
+
+TEST(one_span_compression, varint_size)
+{
+    EXPECT_EQ(1, size_of_varint(0));
+
+    EXPECT_EQ(1, size_of_varint(127));
+    EXPECT_EQ(2, size_of_varint(128));
+
+    EXPECT_EQ(2, size_of_varint(16383));
+    EXPECT_EQ(3, size_of_varint(16384));
+
+    EXPECT_EQ(3, size_of_varint(2097151));
+    EXPECT_EQ(4, size_of_varint(2097152));
+
+    EXPECT_EQ(4, size_of_varint(268435455));
+    EXPECT_EQ(5, size_of_varint(268435456));
+
+    EXPECT_EQ(5, size_of_varint(34359738367));
+    EXPECT_EQ(6, size_of_varint(34359738368));
+
+    EXPECT_EQ(6, size_of_varint(4398046511103));
+    EXPECT_EQ(7, size_of_varint(4398046511104));
+
+    EXPECT_EQ(7, size_of_varint(562949953421311));
+    EXPECT_EQ(8, size_of_varint(562949953421312));
+
+    EXPECT_EQ(8, size_of_varint(72057594037927935));
+    EXPECT_EQ(9, size_of_varint(72057594037927936));
+
+    EXPECT_EQ(8, size_of_varint(72057594037927935));
+    EXPECT_EQ(9, size_of_varint(72057594037927936));
+
+    EXPECT_EQ(9, size_of_varint(9223372036854775807UL));
+    EXPECT_EQ(10, size_of_varint(9223372036854775808UL));
+
+    EXPECT_EQ(10, size_of_varint(std::numeric_limits<uint64_t>::max()));
 }
