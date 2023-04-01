@@ -129,14 +129,29 @@ std::string compress_one_span_format(const std::vector<uint64_t>& data)
         [](const hist_val_t& l, const hist_val_t& r) -> bool
         {
             // Compare the greater value of representation size in stream * number of occurrences
-            return value_stream_size(l.first) * l.second > value_stream_size(r.first) * r.second;
+            // Also if there is only one occurrence, send it to the back, we don't gain anything
+            // by having them in the table.
+            return value_stream_size(l.first) * l.second > value_stream_size(r.first) * r.second
+                && l.second != 1;
         }
     );
 
     // Calculate lookup table size and write it to the output, since 6 bits are available and since
-    // we need one value to designate "not in table", the max table size is 63
-    const uint8_t lookup_table_size = static_cast<uint8_t>(
-        std::min(sorted_histogram.size(), (size_t) 63));
+    // we need one value to designate "not in table", the max table size is 63, but sometimes
+    // there aren't enough unique values so we can terminate it early
+    const size_t max_lookup_table_size = std::min(sorted_histogram.size(), (size_t) 63);
+    uint8_t lookup_table_size;
+    for (lookup_table_size = 0; lookup_table_size < max_lookup_table_size; ++lookup_table_size)
+    {
+        if (sorted_histogram[lookup_table_size].second == 1)
+        {
+            // We've reached the end of the values > 63 that appear more than once, no need to
+            // flesh out the table any further.
+            break;
+        }
+    }
+
+    // Write the table size to output
     uint8_t* p = reinterpret_cast<uint8_t*>(&s[0]);
     *(p++) = lookup_table_size;
 
@@ -145,7 +160,7 @@ std::string compress_one_span_format(const std::vector<uint64_t>& data)
     std::unordered_map<uint64_t, unsigned char> lookup_index_by_value;
     for (uint8_t i = 0; i < lookup_table_size; ++i)
     {
-        const uint64_t& tab_val = sorted_histogram[i].first;
+        const uint64_t tab_val = sorted_histogram[i].first;
         lookup_index_by_value.insert({tab_val, i});
         tools::write_varint(p, tab_val);
     }
@@ -211,7 +226,8 @@ std::vector<uint64_t> decompress_one_span_format(const std::string& compressed)
     auto sit = compressed.cbegin() + 1;
     for (unsigned char i = 0; i <= table_size; ++i)
     {
-        const int nread = tools::read_varint(decltype(sit)(sit), compressed.cend(), lookup_table[i]);
+        const int nread = tools::read_varint(decltype(sit)(sit), compressed.cend(),
+            lookup_table[i]);
         if (nread < 0 || nread > 256)
         {
             throw std::runtime_error("Error decompressing varint table");
