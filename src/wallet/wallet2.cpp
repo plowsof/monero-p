@@ -8798,7 +8798,6 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
               const uint64_t dist_base = block_offset ? our_dist[block_offset - 1] : 0;
               const uint64_t global_base = block_offset ? rct_offsets[block_offset - 1] : 0;
               const uint64_t index_inside_dist_inside_block = i - dist_base;
-              // There's probably a simpler way to do this math
               const uint64_t num_coinbase_in_block = rct_coinbase_offsets[block_offset] -
               (block_offset ? rct_coinbase_offsets[block_offset - 1] : 0);
               const uint64_t index_inside_block =  index_inside_dist_inside_block + 
