@@ -1,8 +1,6 @@
 #include "blocks.h"
 #include "common/one_span_compression.h"
-#include "common/varint.h"
 
-#include <iostream>
 #include <unordered_map>
 
 extern const unsigned char checkpoints[];
