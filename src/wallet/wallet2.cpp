@@ -143,7 +143,7 @@ using namespace cryptonote;
 
 #define GAMMA_SHAPE 19.28
 #define GAMMA_SCALE (1/1.61)
-#define MAX_GAMMA_PICK_TRIES 1000000
+#define MAX_GAMMA_PICK_TRIES 4000000
 
 #define DEFAULT_MIN_OUTPUT_COUNT 5
 #define DEFAULT_MIN_OUTPUT_VALUE (2*COIN)
@@ -8734,6 +8734,27 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
 
         std::unordered_map<const char*, std::set<uint64_t>> picks;
 
+        // Check whether this incoming transfer is a coinbase enote or not.
+        THROW_WALLET_EXCEPTION_IF(rct_offsets.size() != rct_coinbase_offsets.size() ||
+          rct_coinbase_offsets.size() != rct_non_coinbase_offsets.size(),
+          error::wallet_internal_error,
+          "offset distributions differ in size");
+        auto rct_it = std::upper_bound(rct_offsets.cbegin(), rct_offsets.cend(),
+          td.m_global_output_index);
+        THROW_WALLET_EXCEPTION_IF(rct_it == rct_offsets.cend(), error::wallet_internal_error,
+          "Can't determine whether this transfer is coinbase or not b/c the index is too high");
+        const size_t block_offset = std::distance(rct_offsets.cbegin(), rct_it);
+        const uint64_t offset_base = block_offset ? rct_offsets[block_offset - 1] : 0;
+        const uint64_t index_inside_block = td.m_global_output_index - offset_base;
+        const uint64_t first_non_coinbase_in_block = rct_coinbase_offsets[block_offset] -
+          (block_offset ? rct_coinbase_offsets[block_offset - 1] : 0);
+        const bool transfer_is_coinbase = index_inside_block < first_non_coinbase_in_block;
+
+        // Create gamma picker for specifically coinbase or not coinbase to match this transfer
+        const std::vector<uint64_t>& our_dist = transfer_is_coinbase ?
+          rct_coinbase_offsets : rct_non_coinbase_offsets;
+        gamma_picker gamma(our_dist);
+
         // while we still need more mixins
         uint64_t num_usable_outs = num_outs;
         bool allow_blackballed = false;
@@ -8763,32 +8784,13 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
           const char *type = "";
           if (amount == 0)
           {
-            // Check whether this transfer is a coinbase enote or not.
-            auto rct_it = std::upper_bound(rct_offsets.cbegin(), rct_offsets.cend(),
-              td.m_global_output_index);
-            THROW_WALLET_EXCEPTION_IF(rct_it == rct_offsets.cend(), error::wallet_internal_error,
-              "Can't determine whether this transfer is coinbase or not b/c the index is too high");
-            const size_t block_offset = std::distance(rct_offsets.cbegin(), rct_it);
-            const uint64_t offset_base = block_offset ? rct_offsets[block_offset - 1] : 0;
-            const uint64_t index_inside_block = td.m_global_output_index - offset_base;
-            const uint64_t first_non_coinbase_in_block = rct_coinbase_offsets[block_offset] -
-              (block_offset ? rct_coinbase_offsets[block_offset - 1] : 0);
-            const bool transfer_is_coinbase = index_inside_block < first_non_coinbase_in_block;
-            THROW_WALLET_EXCEPTION_IF(rct_offsets.size() != rct_coinbase_offsets.size() || rct_coinbase_offsets.size() != rct_non_coinbase_offsets.size(), error::wallet_internal_error,
-              "Can't determine whether this transfer is coinbase or not b/c the index is too high");
-
-            // Create gamma picker for specifically coinbase or not coinbase to match this transfer
-            const std::vector<uint64_t>& our_dist = transfer_is_coinbase ?
-              rct_coinbase_offsets : rct_non_coinbase_offsets;
-            gamma_picker gamma(our_dist);
-
             // This lambda takes an index as an argument and depending on transfer_is_coinbase,
             // takes what the gamma picker picked and readjusts it back to a global enote index.
             const auto readjust_to_global = [&](uint64_t i) -> uint64_t
             {
               // @TODO: THE LINES BELOW HERE IS TECHNICALLY WRONG. WE NEED TO COMPARE AGAINST
               // gamma.get_num_rct_outs(). WAITING FOR PR #8794
-              if (i >= num_outs /*gamma.get_num_rct_outs()*/)
+              if (i >= our_dist[our_dist.size() - 9] /*gamma.get_num_rct_outs()*/)
                 return std::numeric_limits<uint64_t>::max(); // pass bad picks right thru
 
               const auto i_it = std::upper_bound(our_dist.cbegin(), our_dist.cend(), i);
@@ -8829,7 +8831,8 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
             }
 
             THROW_WALLET_EXCEPTION_IF(tries == MAX_GAMMA_PICK_TRIES, error::wallet_internal_error,
-              "Unbreakbale loop in output selection");
+              "Failed to pick fakes to hide RCT output " + std::to_string(td.m_global_output_index)
+              + " in a timely manner");
           }
           else if (num_found - 1 < recent_outputs_count) // -1 to account for the real one we seeded with
           {
