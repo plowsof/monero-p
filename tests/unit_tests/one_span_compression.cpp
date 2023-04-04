@@ -153,12 +153,7 @@ TEST(one_span_compression, start_finish_correctness)
     }
     EXPECT_TRUE(test_start_finish(utterly_random, false));
 
-    std::vector<uint64_t> max_vals;
-    utterly_random.reserve(10000);
-    for (size_t i = 0; i < 10000; ++i)
-    {
-        max_vals.push_back(std::numeric_limits<uint64_t>::max());
-    }
+    std::vector<uint64_t> max_vals(10000, std::numeric_limits<uint64_t>::max());
     EXPECT_TRUE(test_start_finish(max_vals, false));
 }
 

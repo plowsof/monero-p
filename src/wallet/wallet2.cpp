@@ -990,6 +990,29 @@ bool get_pruned_tx(const cryptonote::COMMAND_RPC_GET_TRANSACTIONS::entry &entry,
   return false;
 }
 
+bool spendable_enote_dist_stats
+(
+  const std::vector<uint64_t>& enote_offsets,
+  uint64_t& num_spendable,
+  const uint64_t** begin = nullptr,
+  const uint64_t** end = nullptr
+)
+{
+  if (enote_offsets.size() < CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE)
+    return false;
+
+  if (begin)
+    *begin = enote_offsets.data();
+
+  const uint64_t* endres = enote_offsets.data() + enote_offsets.size() - (std::max(1, CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE) - 1);
+  if (end)
+    *end = endres;
+
+  num_spendable = *(endres - 1);
+
+  return true;
+}
+
   //-----------------------------------------------------------------
 } //namespace
 
@@ -1002,13 +1025,11 @@ gamma_picker::gamma_picker(const std::vector<uint64_t> &rct_offsets, double shap
     rct_offsets(rct_offsets)
 {
   gamma = std::gamma_distribution<double>(shape, scale);
-  THROW_WALLET_EXCEPTION_IF(rct_offsets.size() <= CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE, error::wallet_internal_error, "Bad offset calculation");
+  THROW_WALLET_EXCEPTION_IF(!spendable_enote_dist_stats(rct_offsets, num_rct_outputs, &begin, &end),
+    error::wallet_internal_error, "Not enough enote offset information on chain");
   const size_t blocks_in_a_year = 86400 * 365 / DIFFICULTY_TARGET_V2;
   const size_t blocks_to_consider = std::min<size_t>(rct_offsets.size(), blocks_in_a_year);
   const size_t outputs_to_consider = rct_offsets.back() - (blocks_to_consider < rct_offsets.size() ? rct_offsets[rct_offsets.size() - blocks_to_consider - 1] : 0);
-  begin = rct_offsets.data();
-  end = rct_offsets.data() + rct_offsets.size() - (std::max(1, CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE) - 1);
-  num_rct_outputs = *(end - 1);
   THROW_WALLET_EXCEPTION_IF(num_rct_outputs == 0, error::wallet_internal_error, "No rct outputs");
   average_output_time = DIFFICULTY_TARGET_V2 * blocks_to_consider / static_cast<double>(outputs_to_consider); // this assumes constant target over the whole rct range
 };
@@ -8444,14 +8465,19 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
 
       rct_non_coinbase_offsets.reserve(rct_offsets.size());
       for (size_t i = 0; i < rct_offsets.size(); ++i)
+      {
+        THROW_WALLET_EXCEPTION_IF(rct_offsets[i] < rct_coinbase_offsets[i], error::get_output_distribution,
+          "RCT offsets vs coinbase offsets provided are bad: rct_offsets < rct_coinbase_offsets");
         rct_non_coinbase_offsets.push_back(rct_offsets[i] - rct_coinbase_offsets[i]);
+      }
     }
 
     if (has_rct)
     {
       // check we're clear enough of rct start, to avoid corner cases below
-      THROW_WALLET_EXCEPTION_IF(rct_offsets.size() <= CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE,
-          error::get_output_distribution, "Not enough rct outputs");
+      uint64_t num_rct_outs_temp;
+      THROW_WALLET_EXCEPTION_IF(!spendable_enote_dist_stats(rct_offsets, num_rct_outs_temp) || !num_rct_outs_temp,
+          error::wallet_internal_error, "Not enough enote offset information on chain");
       THROW_WALLET_EXCEPTION_IF(rct_offsets.back() <= max_rct_index,
           error::get_output_distribution, "Daemon reports suspicious number of rct outputs");
     }
@@ -8562,6 +8588,8 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
     COMMAND_RPC_GET_OUTPUTS_BIN::request req = AUTO_VAL_INIT(req);
     COMMAND_RPC_GET_OUTPUTS_BIN::response daemon_resp = AUTO_VAL_INIT(daemon_resp);
 
+    std::unique_ptr<gamma_picker> gamma;
+
     size_t num_selected_transfers = 0;
     req.outputs.reserve(selected_transfers.size() * (base_requested_outputs_count + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW));
     daemon_resp.outs.reserve(selected_transfers.size() * (base_requested_outputs_count + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW));
@@ -8641,7 +8669,8 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
       else
       {
         // the base offset of the first rct output in the first unlocked block (or the one to be if there's none)
-        num_outs = gamma->get_num_rct_outs();
+        THROW_WALLET_EXCEPTION_IF(!spendable_enote_dist_stats(rct_offsets, num_outs),
+          error::wallet_internal_error, "Not enough enote offset information on chain");
         LOG_PRINT_L1("" << num_outs << " unlocked rct outputs");
         THROW_WALLET_EXCEPTION_IF(num_outs == 0, error::wallet_internal_error,
             "histogram reports no unlocked rct outputs, not even ours");
@@ -8711,29 +8740,16 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         }
       }
 
-      if (num_outs <= requested_outputs_count)
+      // Warning: rct_transfer_is_coinbase may not actually be "correct" in that it will sometimes
+      // be true for non-coinbase transfers when there are not any other usable non-coinbase
+      // decoys. Rather, view this variable as whether or not to treat this transfer as coinbase.
+      bool rct_transfer_is_coinbase = false;
+      bool force_treat_as_coinbase = false;
+      // This is the max number of usable enotes within "our" coinbase/non-coinbase distribution,
+      // not be be confused with num_outs, which is the total number of usable enotes on the chain.
+      uint64_t num_outs_in_coinbasish_dist = 0;
+      if (amount == 0)
       {
-        for (uint64_t i = 0; i < num_outs; i++)
-          req.outputs.push_back({amount, i});
-        // duplicate to make up shortfall: this will be caught after the RPC call,
-        // so we can also output the amounts for which we can't reach the required
-        // mixin after checking the actual unlockedness
-        for (uint64_t i = num_outs; i < requested_outputs_count; ++i)
-          req.outputs.push_back({amount, num_outs - 1});
-      }
-      else
-      {
-        // start with real one
-        if (num_found == 0)
-        {
-          num_found = 1;
-          seen_indices.emplace(td.m_global_output_index);
-          req.outputs.push_back({amount, td.m_global_output_index});
-          LOG_PRINT_L1("Selecting real output: " << td.m_global_output_index << " for " << print_money(amount));
-        }
-
-        std::unordered_map<const char*, std::set<uint64_t>> picks;
-
         // Check whether this incoming transfer is a coinbase enote or not.
         THROW_WALLET_EXCEPTION_IF(rct_offsets.size() != rct_coinbase_offsets.size() ||
           rct_coinbase_offsets.size() != rct_non_coinbase_offsets.size(),
@@ -8748,12 +8764,86 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         const uint64_t index_inside_block = td.m_global_output_index - offset_base;
         const uint64_t first_non_coinbase_in_block = rct_coinbase_offsets[block_offset] -
           (block_offset ? rct_coinbase_offsets[block_offset - 1] : 0);
-        const bool transfer_is_coinbase = index_inside_block < first_non_coinbase_in_block;
+        const bool true_rct_transfer_is_coinbase = index_inside_block < first_non_coinbase_in_block;
+
+        // Find the number of spendable enotes within specifically our ditribution
+        const std::vector<uint64_t>& target_dist = true_rct_transfer_is_coinbase
+          ? rct_coinbase_offsets : rct_non_coinbase_offsets;
+        spendable_enote_dist_stats(target_dist, num_outs_in_coinbasish_dist);
+
+        force_treat_as_coinbase = num_outs_in_coinbasish_dist == 0;
+        rct_transfer_is_coinbase = true_rct_transfer_is_coinbase || force_treat_as_coinbase;
 
         // Create gamma picker for specifically coinbase or not coinbase to match this transfer
-        const std::vector<uint64_t>& our_dist = transfer_is_coinbase ?
-          rct_coinbase_offsets : rct_non_coinbase_offsets;
-        gamma_picker gamma(our_dist);
+        const std::vector<uint64_t>& our_effective_dist = rct_transfer_is_coinbase
+          ? rct_coinbase_offsets : rct_non_coinbase_offsets;
+        spendable_enote_dist_stats(our_effective_dist, num_outs_in_coinbasish_dist);
+        gamma.reset(new gamma_picker(our_effective_dist));
+      }
+
+      // This lambda takes an index of a specifically coinbase/non-conbase distribution, and
+      // depending on rct_transfer_is_coinbase, readjusts it back to a global enote index.
+      const auto readjust_to_global =
+        [&rct_offsets, &rct_coinbase_offsets, &rct_non_coinbase_offsets, rct_transfer_is_coinbase,
+          num_outs_in_coinbasish_dist] (uint64_t i) -> uint64_t
+      {
+        const std::vector<uint64_t>& our_dist = rct_transfer_is_coinbase
+          ? rct_coinbase_offsets : rct_non_coinbase_offsets;
+
+        if (i >= num_outs_in_coinbasish_dist)
+          return std::numeric_limits<uint64_t>::max(); // pass bad picks right thru
+
+        const auto i_it = std::upper_bound(our_dist.cbegin(), our_dist.cend(), i);
+        THROW_WALLET_EXCEPTION_IF(i_it == our_dist.cend(), error::wallet_internal_error,
+          "Can't find gamma picked index within little distribution");
+        const size_t block_offset = std::distance(our_dist.cbegin(), i_it);
+        const uint64_t dist_base = block_offset ? our_dist[block_offset - 1] : 0;
+        const uint64_t global_base = block_offset ? rct_offsets[block_offset - 1] : 0;
+        const uint64_t index_inside_dist_inside_block = i - dist_base;
+        const uint64_t num_coinbase_in_block = rct_coinbase_offsets[block_offset] -
+        (block_offset ? rct_coinbase_offsets[block_offset - 1] : 0);
+        const uint64_t index_inside_block =  index_inside_dist_inside_block +
+          (rct_transfer_is_coinbase ? 0 : num_coinbase_in_block);
+        const uint64_t global_index = global_base + index_inside_block;
+        return global_index;
+      };
+
+      if (num_outs <= requested_outputs_count)
+      {
+        for (uint64_t i = 0; i < num_outs; i++)
+          req.outputs.push_back({amount, i});
+        // duplicate to make up shortfall: this will be caught after the RPC call,
+        // so we can also output the amounts for which we can't reach the required
+        // mixin after checking the actual unlockedness
+        for (uint64_t i = num_outs; i < requested_outputs_count; ++i)
+          req.outputs.push_back({amount, num_outs - 1});
+      }
+      else if (amount == 0 && num_outs_in_coinbasish_dist <= requested_outputs_count)
+      {
+        std::unordered_set<uint64_t> enotes_to_add;
+        enotes_to_add.insert(td.m_global_output_index);
+        for (uint64_t i = 0; i < num_outs_in_coinbasish_dist; ++i)
+          enotes_to_add.insert(readjust_to_global(i));
+        for (int64_t i = num_outs - 1; i >= 0 && enotes_to_add.size() < requested_outputs_count; --i)
+          enotes_to_add.insert(static_cast<uint64_t>(i));
+        THROW_WALLET_EXCEPTION_IF(enotes_to_add.size() != requested_outputs_count,
+          error::wallet_internal_error,
+          "internal bug: enotes_to_add did not become sufficient size for sparse selection");
+        for (const uint64_t& enote : enotes_to_add)
+          req.outputs.push_back({0, enote});
+      }
+      else
+      {
+        // start with real one
+        if (num_found == 0)
+        {
+          num_found = 1;
+          seen_indices.emplace(td.m_global_output_index);
+          req.outputs.push_back({amount, td.m_global_output_index});
+          LOG_PRINT_L1("Selecting real output: " << td.m_global_output_index << " for " << print_money(amount));
+        }
+
+        std::unordered_map<const char*, std::set<uint64_t>> picks;
 
         // while we still need more mixins
         uint64_t num_usable_outs = num_outs;
@@ -8784,49 +8874,26 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
           const char *type = "";
           if (amount == 0)
           {
-            // This lambda takes an index as an argument and depending on transfer_is_coinbase,
-            // takes what the gamma picker picked and readjusts it back to a global enote index.
-            const auto readjust_to_global = [&](uint64_t i) -> uint64_t
-            {
-              // @TODO: THE LINES BELOW HERE IS TECHNICALLY WRONG. WE NEED TO COMPARE AGAINST
-              // gamma.get_num_rct_outs(). WAITING FOR PR #8794
-              if (i >= our_dist[our_dist.size() - 9] /*gamma.get_num_rct_outs()*/)
-                return std::numeric_limits<uint64_t>::max(); // pass bad picks right thru
-
-              const auto i_it = std::upper_bound(our_dist.cbegin(), our_dist.cend(), i);
-              THROW_WALLET_EXCEPTION_IF(i_it == our_dist.cend(), error::wallet_internal_error,
-                "Can't find gamma picked index within little distribution");
-              const size_t block_offset = std::distance(our_dist.cbegin(), i_it);
-              const uint64_t dist_base = block_offset ? our_dist[block_offset - 1] : 0;
-              const uint64_t global_base = block_offset ? rct_offsets[block_offset - 1] : 0;
-              const uint64_t index_inside_dist_inside_block = i - dist_base;
-              const uint64_t num_coinbase_in_block = rct_coinbase_offsets[block_offset] -
-              (block_offset ? rct_coinbase_offsets[block_offset - 1] : 0);
-              const uint64_t index_inside_block =  index_inside_dist_inside_block + 
-                (transfer_is_coinbase ? 0 : num_coinbase_in_block);
-              const uint64_t global_index = global_base + index_inside_block;
-              return global_index;
-            };
-
+            THROW_WALLET_EXCEPTION_IF(!gamma, error::wallet_internal_error, "No gamma picker");
             // gamma distribution
             size_t tries = 0;
             i = std::numeric_limits<uint64_t>::max();
             if (num_found -1 < recent_outputs_count + pre_fork_outputs_count)
             {
               for (; tries < MAX_GAMMA_PICK_TRIES && i >= segregation_limit[amount].first; ++tries)
-                i = readjust_to_global(gamma.pick());
+                i = readjust_to_global(gamma->pick());
               type = "pre-fork gamma";
             }
             else if (num_found -1 < recent_outputs_count + pre_fork_outputs_count + post_fork_outputs_count)
             {
               for (; tries < MAX_GAMMA_PICK_TRIES && (i < segregation_limit[amount].first || i >= num_outs); ++tries)
-                i = readjust_to_global(gamma.pick());
+                i = readjust_to_global(gamma->pick());
               type = "post-fork gamma";
             }
             else
             {
               for (; tries < MAX_GAMMA_PICK_TRIES && i >= num_outs; ++tries)
-                i = readjust_to_global(gamma.pick());
+                i = readjust_to_global(gamma->pick());
               type = "gamma";
             }
 
@@ -8978,7 +9045,10 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
       }
       bool use_histogram = amount != 0;
       if (!use_histogram)
-        num_outs = gamma->get_num_rct_outs();
+      {
+        THROW_WALLET_EXCEPTION_IF(!spendable_enote_dist_stats(rct_offsets, num_outs),
+          error::wallet_internal_error, "Not enough enote offset information on chain");
+      }
 
       // make sure the real outputs we asked for are really included, along
       // with the correct key and mask: this guards against an active attack

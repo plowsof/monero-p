@@ -6,6 +6,8 @@
 #include "blocks/blocks.h"
 #include "cryptonote_core/cryptonote_core.h"
 
+#define HF_VERSION_RCT HF_VERSION_DYNAMIC_FEE
+
 namespace cryptonote
 {
 namespace rpc
@@ -182,6 +184,10 @@ namespace rpc
       }
     }
 
+    all_potent_invalid = all_potent_invalid
+      || (top_9_potent_invalid && num_blocks_cached <= 9)
+      || (top_99_potent_invalid && num_blocks_cached <= 99);
+
     if (all_potent_invalid)
     {
       revert_to_hardcoded_rct_state();
@@ -228,7 +234,20 @@ namespace rpc
 
       for (const auto& b : blocks)
       {
-        m_num_cb_outs_per_block.push_back(b.miner_tx.vout.size());
+        if (b.major_version >= HF_VERSION_RCT)
+        {
+          m_num_cb_outs_per_block.push_back(b.miner_tx.vout.size());
+        }
+        else
+        {
+          // On fakechain, the genesis block isn't a RCT block so its miner tx should not be counted
+          // towards the coinbase enote count, but everywhere else, this condition should never
+          // occur, which is the point of revert_to_hardcoded_rct_state(). This is to match the
+          // behavior of get_output_distribution for amount==0 on the fakechain: the start height is
+          // 0, but the first element of the returned distribution is 0.
+          CHECK_AND_ASSERT_THROW_MES(m_net_type == FAKECHAIN, "Processed non-RCT miner tx off fakechain");
+          m_num_cb_outs_per_block.push_back(0);
+        }
       }
     }
 
