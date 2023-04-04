@@ -8740,11 +8740,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         }
       }
 
-      // Warning: rct_transfer_is_coinbase may not actually be "correct" in that it will sometimes
-      // be true for non-coinbase transfers when there are not any other usable non-coinbase
-      // decoys. Rather, view this variable as whether or not to treat this transfer as coinbase.
       bool rct_transfer_is_coinbase = false;
-      bool force_treat_as_coinbase = false;
       // This is the max number of usable enotes within "our" coinbase/non-coinbase distribution,
       // not be be confused with num_outs, which is the total number of usable enotes on the chain.
       uint64_t num_outs_in_coinbasish_dist = 0;
@@ -8764,21 +8760,15 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         const uint64_t index_inside_block = td.m_global_output_index - offset_base;
         const uint64_t first_non_coinbase_in_block = rct_coinbase_offsets[block_offset] -
           (block_offset ? rct_coinbase_offsets[block_offset - 1] : 0);
-        const bool true_rct_transfer_is_coinbase = index_inside_block < first_non_coinbase_in_block;
+        rct_transfer_is_coinbase = index_inside_block < first_non_coinbase_in_block;
 
         // Find the number of spendable enotes within specifically our ditribution
-        const std::vector<uint64_t>& target_dist = true_rct_transfer_is_coinbase
+        const std::vector<uint64_t>& our_dist = rct_transfer_is_coinbase
           ? rct_coinbase_offsets : rct_non_coinbase_offsets;
-        spendable_enote_dist_stats(target_dist, num_outs_in_coinbasish_dist);
-
-        force_treat_as_coinbase = num_outs_in_coinbasish_dist == 0;
-        rct_transfer_is_coinbase = true_rct_transfer_is_coinbase || force_treat_as_coinbase;
+        spendable_enote_dist_stats(our_dist, num_outs_in_coinbasish_dist);
 
         // Create gamma picker for specifically coinbase or not coinbase to match this transfer
-        const std::vector<uint64_t>& our_effective_dist = rct_transfer_is_coinbase
-          ? rct_coinbase_offsets : rct_non_coinbase_offsets;
-        spendable_enote_dist_stats(our_effective_dist, num_outs_in_coinbasish_dist);
-        gamma.reset(new gamma_picker(our_effective_dist));
+        gamma.reset(new gamma_picker(our_dist));
       }
 
       // This lambda takes an index of a specifically coinbase/non-conbase distribution, and

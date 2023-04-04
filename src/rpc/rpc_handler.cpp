@@ -245,7 +245,7 @@ namespace rpc
           // occur, which is the point of revert_to_hardcoded_rct_state(). This is to match the
           // behavior of get_output_distribution for amount==0 on the fakechain: the start height is
           // 0, but the first element of the returned distribution is 0.
-          CHECK_AND_ASSERT_THROW_MES(m_net_type == FAKECHAIN, "Processed non-RCT miner tx off fakechain");
+          CHECK_AND_ASSERT_MES(m_net_type == FAKECHAIN, false, "Processed non-RCT miner tx off fakechain");
           m_num_cb_outs_per_block.push_back(0);
         }
       }
