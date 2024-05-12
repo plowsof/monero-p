@@ -17,8 +17,8 @@ jobs:
           cd monero
 
           # Setup the committers identity.
-          git config --global user.email "plowsof@protonmail.com"
-          git config --global user.name "plowsof"
+          git config --global user.email "copyCat@cat.com"
+          git config --global user.name "copyCat"
 
           git remote set-url origin https://x-access-token:${{ secrets.ACCESS_TOKEN }}@github.com/plowsof/monero.git
 
