@@ -8,14 +8,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Make changes to pull request
-        continue-on-error: true
         shell: bash
         run: |
+          gh repo fork https://github.com/selsta/monero.git --clone
+          cd monero
+
           # Setup the committers identity.
           git config user.email "copyCat@cat.com"
           git config user.name "copyCat"
 
-                    year=$(date +%Y)
+          year=$(date +%Y)
           echo "YEAR=$(echo $year)" >> $GITHUB_ENV
           find . -print0 | while IFS= read -r -d '' file
           do
