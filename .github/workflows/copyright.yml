@@ -37,7 +37,7 @@ jobs:
                   # we need to replace FROM with current year
                   to=$(awk '{split($0, array, "-"); print array[2]}' <<< ${fromTo})
                   from=$(awk '{split($0, array, "-"); print array[1]}' <<< ${fromTo})
-                  repl=${line/"${to}-${from}"/"${to}-${year}"}
+                  repl=${line/"$to-$from"/"$to-$year"}
               else
                   # we only have a FROM year
                   # find occurance of 4 digits
