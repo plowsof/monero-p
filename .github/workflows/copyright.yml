@@ -20,7 +20,7 @@ jobs:
           git config --global user.email "plowsof@protonmail.com"
           git config --global user.name "plowsof"
 
-          git remote set-url origin https://x-access-token:${{ secrets.PAT }}@github.com/plowsof/monero.git
+          git remote set-url origin https://x-access-token:${{ secrets.ACCESS_TOKEN }}@github.com/plowsof/monero.git
 
           year=$(date +%Y)
           echo "YEAR=$(echo $year)" >> $GITHUB_ENV
