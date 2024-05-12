@@ -17,8 +17,8 @@ jobs:
           cd monero
 
           # Setup the committers identity.
-          #git config user.email "copyCat@cat.com"
-          #git config user.name "copyCat"
+          git config --global user.email "copyCat@example.com"
+          git config --global user.name "copy Cat"
 
           year=$(date +%Y)
           echo "YEAR=$(echo $year)" >> $GITHUB_ENV
