@@ -55,5 +55,5 @@ jobs:
           git add .
           git commit -m "extnernal PR in workflow"
           git push origin HEAD:external_bump_copyright --force
-          gh pr create --body "Happy new year! this came from an external workflow!" --title "External PR copyright bump" --head "plowsof:external_bump_copyright" --base "master" --dry-run
+          gh pr create --body "Happy new year! this came from an external workflow!" --title "External PR copyright bump" --head "plowsof:external_bump_copyright" --base "master"
 
