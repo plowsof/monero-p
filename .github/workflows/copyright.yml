@@ -7,12 +7,15 @@ jobs:
   createPullRequest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - name: Make changes to pull request
         continue-on-error: true
         shell: bash
         run: |
-          year=$(date +%Y)
+          # Setup the committers identity.
+          git config user.email "copyCat@cat.com"
+          git config user.name "copyCat"
+
+                    year=$(date +%Y)
           echo "YEAR=$(echo $year)" >> $GITHUB_ENV
           find . -print0 | while IFS= read -r -d '' file
           do
@@ -28,7 +31,8 @@ jobs:
                   # string contains "FROM-TO"
                   # we need to replace FROM with current year
                   to=$(awk '{split($0, array, "-"); print array[2]}' <<< ${fromTo})
-                  repl=${line/"$to"/"$year"}
+                  from=$(awk '{split($0, array, "-"); print array[1]}' <<< ${fromTo})
+                  repl=${line/"${to}-${from}"/"${to}-${year}"}
               else
                   # we only have a FROM year
                   # find occurance of 4 digits
@@ -39,18 +43,10 @@ jobs:
               fi
               sed -i "s|${line}|${repl}|g" $file
           done
-      - name: Create Pull Request
-        id: cpr
-        uses: peter-evans/create-pull-request@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Copyright: Update to ${{ env.YEAR }}"
-          committer: GitHub <noreply@github.com>
-          author: copyCat <copy@Cat.com>
-          signoff: false
-          branch: bump-copyright-year
-          delete-branch: true
-          title: "Copyright: Update to ${{ env.YEAR }}"
-          body: |
-            Happy new year!
-          draft: false
+
+          # Commit the changes and push the feature branch to origin
+          git add .
+          git commit -m "extnernal PR in workflow"
+          git push origin HEAD:external_bump_copyright --force
+          gh pr create --body "Happy new year! this came from an external workflow!" --title "External PR copyright bump" --head "plowsof:external_bump_copyright" --base "master" --dry-run
+
