@@ -21,7 +21,7 @@ jobs:
           git config --global user.name "copyCat"
 
           git remote set-url origin https://x-access-token:${{ secrets.ACCESS_TOKEN }}@github.com/plowsof/monero.git
-          git checkout -b external_bump_copyright
+          git checkout -b external_fresh
           year=$(date +%Y)
           echo "YEAR=$(echo $year)" >> $GITHUB_ENV
           find . -print0 | while IFS= read -r -d '' file
@@ -38,7 +38,8 @@ jobs:
                   # string contains "FROM-TO"
                   # we need to replace FROM with current year
                   to=$(awk '{split($0, array, "-"); print array[2]}' <<< ${fromTo})
-                  repl=${line/"$to"/"$year"}
+                  from=$(awk '{split($0, array, "-"); print array[1]}' <<< ${fromTo})
+                  repl=${line/"$from-$to"/"$from-$year"}
               else
                   # we only have a FROM year
                   # find occurance of 4 digits
@@ -54,6 +55,6 @@ jobs:
           git status
           git add *
           git commit -m "extnernal PR in workflow"
-          git push origin HEAD:external_bump_copyright --force
-          gh pr create --body "Happy new year! this came from an external workflow!" --title "External PR copyright bump" --head "plowsof:external_bump_copyright" --base "master" --dry-run
+          git push origin HEAD:external_fresh --force
+          gh pr create --body "Happy new year! this came from an external workflow!" --title "External PR copyright bump" --head "plowsof:external_fresh" --base "master" --dry-run
 
