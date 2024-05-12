@@ -21,7 +21,7 @@ jobs:
           git config --global user.name "copyCat"
 
           git remote set-url origin https://x-access-token:${{ secrets.ACCESS_TOKEN }}@github.com/plowsof/monero.git
-
+          git checkout -b external_bump_copyright
           year=$(date +%Y)
           echo "YEAR=$(echo $year)" >> $GITHUB_ENV
           find . -print0 | while IFS= read -r -d '' file
@@ -38,8 +38,7 @@ jobs:
                   # string contains "FROM-TO"
                   # we need to replace FROM with current year
                   to=$(awk '{split($0, array, "-"); print array[2]}' <<< ${fromTo})
-                  from=$(awk '{split($0, array, "-"); print array[1]}' <<< ${fromTo})
-                  repl=${line/"$to-$from"/"$to-$year"}
+                  repl=${line/"$to"/"$year"}
               else
                   # we only have a FROM year
                   # find occurance of 4 digits
