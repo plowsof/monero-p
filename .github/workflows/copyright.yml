@@ -21,7 +21,9 @@ jobs:
           git config --global user.name "copyCat"
 
           git remote set-url origin https://x-access-token:${{ secrets.ACCESS_TOKEN }}@github.com/plowsof/monero.git
-          git checkout -b external_fresh
+          git fetch origin
+          git reset --hard upstream/master
+          git checkout -b external_fresh_wat
           year=$(date +%Y)
           echo "YEAR=$(echo $year)" >> $GITHUB_ENV
           find . -print0 | while IFS= read -r -d '' file
@@ -55,6 +57,6 @@ jobs:
           git status
           git add *
           git commit -m "extnernal PR in workflow"
-          git push origin HEAD:external_fresh --force
-          gh pr create --body "Happy new year! this came from an external workflow!" --title "External PR copyright bump" --head "plowsof:external_fresh" --base "master" --dry-run
+          git push origin HEAD:external_fresh_wat --force
+          gh pr create --body "Happy new year! this came from an external workflow!" --title "External PR copyright bump" --head "plowsof:external_fresh_wat" --base "master" --dry-run
 
