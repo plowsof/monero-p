@@ -21,7 +21,6 @@ jobs:
           git config --global user.name "copyCat"
 
           git remote set-url origin https://x-access-token:${{ secrets.ACCESS_TOKEN }}@github.com/plowsof/monero.git
-          git fetch origin
           git reset --hard upstream/master
           git checkout -b external_fresh_wat
           year=$(date +%Y)
