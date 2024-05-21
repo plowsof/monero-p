@@ -21,9 +21,9 @@ jobs:
           git config --global user.name "copyCat"
 
           git remote set-url origin https://x-access-token:${{ secrets.ACCESS_TOKEN }}@github.com/plowsof/monero.git
-          git reset --hard upstream/master
-          git checkout -b external_fresh_wat
           year=$(date +%Y)
+          git checkout -b external_fresh_wat_$year
+          git reset --hard upstream/master
           echo "YEAR=$(echo $year)" >> $GITHUB_ENV
           find . -print0 | while IFS= read -r -d '' file
           do
@@ -55,7 +55,7 @@ jobs:
           # Commit the changes and push the feature branch to origin
           git status
           git add *
-          git commit -m "extnernal PR in workflow"
-          git push origin HEAD:external_fresh_wat --force
-          gh pr create --body "Happy new year! \n From an external runflow @ https://github.com/plowsof/monero/actions/runs/${GITHUB_RUN_ID}" --title "copyright: bump to ${year}" --head "plowsof:external_fresh_wat" --base "master" --dry-run
+          git commit -m "copyright: bump to ${year}"
+          git push origin HEAD:external_fresh_wat_${year} --force
+          gh pr create --body "Happy new year! \n From an external runflow @ https://github.com/plowsof/monero/actions/runs/${GITHUB_RUN_ID}" --title "copyright: bump to ${year}" --head "plowsof:external_fresh_wat_${year}" --base "master" --dry-run
 
