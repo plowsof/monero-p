@@ -22,7 +22,7 @@ jobs:
 
           git remote set-url origin https://x-access-token:${{ secrets.ACCESS_TOKEN }}@github.com/plowsof/monero.git
           year=$(date +%Y)
-          git checkout -b external_fresh_wat_$year
+          git checkout -b bump_copyright_$year
           git reset --hard upstream/master
           echo "YEAR=$(echo $year)" >> $GITHUB_ENV
           find . -print0 | while IFS= read -r -d '' file
@@ -56,7 +56,7 @@ jobs:
           git status
           git add *
           git commit -m "copyright: bump to ${year}"
-          git push origin HEAD:external_fresh_wat_${year} --force
+          git push origin HEAD:bump_copyright_${year} --force
           echo -e "\n" > _n
-          gh pr create --body "Happy new year! :smiley_cat: ${_n}${_n}${_n} From an external runflow @ https://github.com/plowsof/monero/actions/runs/${GITHUB_RUN_ID}" --title "copyright: bump to ${year}" --head "plowsof:external_fresh_wat_${year}" --base "master" #--dry-run
+          gh pr create --body "Happy new year! :smiley_cat:    ${_n}     ${_n}$    {_n}    From an external runflow @ https://github.com/plowsof/monero/actions/runs/${GITHUB_RUN_ID}" --title "copyright: bump to ${year}" --head "plowsof:bump_copyright_${year}" --base "master" #--dry-run
 
