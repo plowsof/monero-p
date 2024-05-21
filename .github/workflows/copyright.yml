@@ -57,5 +57,6 @@ jobs:
           git add *
           git commit -m "copyright: bump to ${year}"
           git push origin HEAD:external_fresh_wat_${year} --force
-          gh pr create --body -e "Happy new year! \n From an external runflow @ https://github.com/plowsof/monero/actions/runs/${GITHUB_RUN_ID}" --title "copyright: bump to ${year}" --head "plowsof:external_fresh_wat_${year}" --base "master" #--dry-run
+          echo -e "\n" > _n
+          gh pr create --body "Happy new year! :smiley_cat: ${_n}${_n}${_n} From an external runflow @ https://github.com/plowsof/monero/actions/runs/${GITHUB_RUN_ID}" --title "copyright: bump to ${year}" --head "plowsof:external_fresh_wat_${year}" --base "master" #--dry-run
 
