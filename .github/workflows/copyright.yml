@@ -13,7 +13,7 @@ jobs:
           echo "${{ secrets.ACCESS_TOKEN }}" > token.txt
           gh auth login --with-token < token.txt
           
-          gh repo fork https://github.com/monero-project/monero.git --clone
+          gh repo fork https://github.com/selsta/monero.git --clone
           cd monero
 
           # Setup the committers identity.
