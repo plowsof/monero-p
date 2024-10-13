@@ -1,5 +1,5 @@
 package=freebsd_base
-$(package)_version=11.3
+$(package)_version=14.1
 $(package)_download_path=https://download.freebsd.org/ftp/releases/amd64/$($(package)_version)-RELEASE/
 $(package)_download_file=base.txz
 $(package)_file_name=freebsd-base-$($(package)_version).txz
