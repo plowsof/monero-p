@@ -21,7 +21,10 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
-// Code surrounding the word list is Copyright (c) 2014-2024, The Monero Project
+// Code surrounding the word list is Copyright (c) The Monero Project
+// Code surrounding the word list is 
+// Code surrounding the word list is This source code is licensed under the BSD-3 license found in the
+// Code surrounding the word list is LICENSE file in the root directory of this source tree.
 //
 // All rights reserved.
 //

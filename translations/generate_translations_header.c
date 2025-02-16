@@ -1,5 +1,8 @@
 // Copyright (c) 2013, Sergey Lyubka
-// Copyright (c) 2017-2024, The Monero Project
+// Copyright (c) The Monero Project
+// 
+// This source code is licensed under the BSD-3 license found in the
+// LICENSE file in the root directory of this source tree.
 // All rights reserved.
 // Released under the MIT license.
 

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2023-2024, The Monero Project
+# Copyright (c) The Monero Project
+# 
+# This source code is licensed under the BSD-3 license found in the
+# LICENSE file in the root directory of this source tree.
 #
 # All rights reserved.
 #
