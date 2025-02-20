@@ -2,7 +2,10 @@
 # Simulate a maximal block attack on the Monero network
 # This uses the scheme proposed by ArticMine
 # Written by Sarang Nother
-# Copyright (c) 2019-2024, The Monero Project
+# Copyright (c) The Monero Project
+# 
+# This source code is licensed under the BSD-3 license found in the
+# LICENSE file in the root directory of this source tree.
 import sys
 import math
 
