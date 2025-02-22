@@ -1,7 +1,8 @@
 // Copyright (c) 2013, Sergey Lyubka
-// Copyright (c) 2017-2024, The Monero Project
-// All rights reserved.
-// Released under the MIT license.
+// Copyright (c) The Monero Project
+// 
+// This source code is licensed under the BSD-3 license found in the
+// LICENSE file in the root directory of this source tree.
 
 // This program takes a list of files as an input, and produces C++ code that
 // contains the contents of all these files as a collection of strings.
